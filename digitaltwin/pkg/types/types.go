@@ -8,12 +8,19 @@ import (
 // you can modify a things's property's value as desired state, and tings can report the property value as 
 // reported state.   
 type DigitalTwin struct {
+	// device id	
 	ID		string		`json:"id"`	
+	//device name
 	Name	string 		`json:"name,omitempty"`
+	// device description
 	Description		string		`json:"description,omitempty"`
+	// device state
 	State	string 		`json:"state,omitempty"`
+	// device last state
 	LastState	string	`json:"laststate,omitempty"`
+	// device metadata  
 	MetaData	[string]PropertyValue	`json:"metadata,omitempty"`
+	//all properties
 	Properties	TwinProperties			`json:"properties,omitempty"`	
 }
 

@@ -9,13 +9,17 @@ import (
 )
 
 type DTContext struct {
-	DeviceID	string
-	Context		*context.Context
-	Modules		map[string]dtmodule.DTModule
-	CommChan	map[string]chan interface{}
-	HeartBeatChan map[string]chan interface{}
-	ConfirmChan	chan interface{}
-	ModuleHealth	*sync.Map	
+	DeviceID		string
+	Context			*context.Context
+	Modules			map[string]dtmodule.DTModule
+	CommChan		map[string]chan interface{}
+	HeartBeatChan 	map[string]chan interface{}
+	ConfirmChan		chan interface{}
+
+	ModuleHealth	*sync.Map
+	// Cache for digitaltwin	
+	DGTwinList	*sync.Map
+	DGTwinMutex	*sync.Map	
 }
 
 func NewDTContext(c *context.Context) *DTContext {
@@ -66,4 +70,54 @@ func (dtc *DTContext) HandleHeartBeat(dtmName string, content string) error {
 	return nil
 }
 
+//GetMutex get the device mutex
+func (dtc *DTContext) GetMutex (deviceID string) (*sync.Mutex, bool) {
+	v, exist := dtc.DGTwinMutex.Load(deviceID)
+	if !exist {
+		return nil, false
+	}
 
+	mutex, isMutex := v.(*sync.Mutex)
+	if !isMutex {
+		return nil, false
+	}
+
+	return mutex, true
+}
+
+//Lock  device by ID
+func (dtc *DTContext) Lock (deviceID string) bool {
+	mutex, ok := GetMutex(deviceID)
+	if ok {
+		mutex.Lock()
+		return true
+	}
+
+	return false
+}
+
+//unlock device by ID 
+func (dtc *DTContext) Unlock (deviceID string) bool {
+	mutex, ok := GetMutex(deviceID)
+	if ok {
+		mutex.Unlock()
+		return true
+	}
+
+	return false
+}
+
+//digital twin is exist.
+func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
+	v, exist := dtc.DGTwinList.Load(deviceID)
+	if !exist {
+		return false
+	}
+
+	dgtwin, isDGTwin := v.(*types.DigitalTwin)
+	if !isDGTwin {
+		return false
+	}
+
+	return true
+}
