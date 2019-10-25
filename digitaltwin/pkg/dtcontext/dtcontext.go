@@ -18,6 +18,7 @@ type DTContext struct {
 	ConfirmChan		chan interface{}
 
 	ModuleHealth	*sync.Map
+	MessageCache	*sync.Map
 	// Cache for digitaltwin	
 	DGTwinList	*sync.Map
 	DGTwinMutex	*sync.Map	
@@ -29,6 +30,7 @@ func NewDTContext(c *context.Context) *DTContext {
 	heartBeatChan:= make(map[string]chan interface{})
 	confirmChan :=	make(chan interface{})
 	var modulesHealth sync.Map
+	var messageCache sync.Map
 
 	return &DTContext{
 		Context:	c,
@@ -37,6 +39,7 @@ func NewDTContext(c *context.Context) *DTContext {
 		HeartBeatChan:	heartBeatChan,
 		ConfirmChan:	confirmChan,
 		ModuleHealth:	&modulesHealth,
+		MessageCache:   &messageCache,
 	}
 }
 
@@ -49,6 +52,7 @@ func (dtc *DTContext) RegisterDTModule(dtm dtmodule.DTModule){
 	dtc.Modules[moduleName] = dtm
 }
 
+// send msg  to sub-module
 func (dtc *DTContext) SendToModule(dtmName string, content interface{}) error {
 	if ch, exist := dtc.CommChan[dtmName];  exist {
 		ch <- content
@@ -139,16 +143,9 @@ func (dtc *DTContext) BuildModelMessage(source string, target string, operation 
 	return msg
 }
 
-//send message to sub-module.
-func (dtc *DTContext) Send(module string, action string, msg *model.Message) error {
-	dtMsg := &types.DTMessage{
-		Msg: 	msg,
-		Source: "",
-		Target: module,
-		Operation: action, 
-	}
-
-	return dtc.SendToModule(module, dtMsg)
+//send message to module.
+func (dtc *DTContext) Send(module string, msg *model.Message) {
+	dtc.Context.Send(module, *msg)
 }
 
 func (dtc *DTContext) BuildDTMessage(source string, target string, operation string, resource string, msg *model.Message) *types.DTMessage {

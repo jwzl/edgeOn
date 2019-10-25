@@ -122,7 +122,8 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error
 			}else{
 				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, \
 						types.DGTWINS_OPS_RESPONSE, resource, msgContent)
-
+				//mark the request message id
+				modelMsg.SetTag(message.GetID())	
 				//send the msg to comm module and process it
 				err := dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 				if err != nil {
