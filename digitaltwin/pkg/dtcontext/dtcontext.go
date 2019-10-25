@@ -1,6 +1,7 @@
 package dtcontext
 
 import (
+	"fmt"
 	"time"
 	"sync"
 	"errors"
@@ -120,4 +121,44 @@ func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
 	}
 
 	return true
+}
+
+func (dtc *DTContext) BuildModelMessage(source string, target string, operation string, resource string, content interface{}) *model.Message {
+	now := time.Now().UnixNano() / 1e6
+	
+	//Header
+	msg := model.NewMessage("")
+	msg.BuildHeader("", now)
+
+	//Router
+	BuildRouter(source, "", target, resource, operation)
+	
+	//content
+	msg.Content = content
+	
+	return msg
+}
+
+//send message to sub-module.
+func (dtc *DTContext) Send(module string, action string, msg *model.Message) error {
+	dtMsg := &types.DTMessage{
+		Msg: 	msg,
+		Source: "",
+		Target: module,
+		Operation: action, 
+	}
+
+	return dtc.SendToModule(module, dtMsg)
+}
+
+func (dtc *DTContext) BuildDTMessage(source string, target string, operation string, resource string, msg *model.Message) *types.DTMessage {
+	dtMsg := &types.DTMessage{
+		Msg: 	msg,
+		Source: source,
+		Target: target,
+		Operation: operation,
+		Resource:  resource, 
+	}
+	
+	return dtMsg
 }

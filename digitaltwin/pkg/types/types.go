@@ -3,6 +3,14 @@ package types
 import (
 	"github.com/jwzl/wssocket/model"
 )
+
+const {
+	MODULE_NAME = "edge/dgtwin"
+	//module name
+	DGTWINS_MODULE_TWINS	= "twins"
+	DGTWINS_MODULE_PROPERTY	= "property"
+	DGTWINS_MODULE_COMM	= "comm"
+}
 // DigitalTwin is a digital description about things in physical world. If you want to do something
 // for things in physical world, you just need to access the digitaltwin. 
 // you can modify a things's property's value as desired state, and tings can report the property value as 
@@ -41,8 +49,8 @@ type PropertyValue struct {
 type DTMessage struct {
 	Msg      	*model.Message
 	Source 		string
+	Target 		string
 	Operation   string
-	Resource    string
 }
 //Back-end opertaion
 //1. Retrieve digital twin by ID.

@@ -5,7 +5,7 @@ import (
 	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
 )
 
-type DeviceCommandFunc  func(msg interface{})(interface{}, error)			
+type DeviceCommandFunc  func(source string, resource string, msg interface{})(interface{}, error)			
 //this module process the device Create/delete/update/query.
 type DeviceModule struct {
 	// module name
@@ -60,7 +60,7 @@ func (dm *DeviceModule) Start(){
 			if isDTMsg {
 		 		// do handle.
 				if fn, exist := dm.deviceCommandTbl[message.Operation]; exist {
-					_, err := fn(message.Msg)
+					_, err := fn(message.Source, message.Msg)
 					if err != nil {
 						klog.Errorf("Handle %s failed, ignored", message.Operation)
 					}
@@ -84,32 +84,69 @@ func (dm *DeviceModule) Start(){
 
 // handle device create and update.
 func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error) {
-	var dgTwin types.DigitalTwin
+	var dgTwinMsg types.DGTwinMessage 
 	message, isMsgType := msg.(*model.Message)
 	if !isMsgType {
 		return nil, errors.New("invaliad message type")
 	}
+	msgRespWhere := msg.GetSource()
+	resource := msg.GetResource()
+
 	content, ok := message.Content.([]byte)
 	if !ok {
 		return nil, errors.New("invaliad message content")
 	}
 
-	err := json.Unmarshal(content, &dgTwin)
+	err := json.Unmarshal(content, &dgTwinMsg)
 	if err != nil {
 		return nil, err
 	}
-	
-	deviceID := dgTwin.ID
-	exist := dm.context.DGTwinIsExist(deviceID)
-	if !exist {
-		//Create DGTwin
-				
-	}else {
-		//Update DGTwin
-	}
-	// Read from sqlite
 
-	//save to sqlite
+	//get all requested twins
+	for _, dgTwin := range dgTwinMsg.Twins	{
+		//for each dgtwin
+		deviceID := dgTwin.ID
+		exist := dm.context.DGTwinIsExist(deviceID)
+		if !exist {
+			//Create DGTwin
+			//Infutre, we will store DGTwin into sqlite database. 
+			dm.context.DGTwinList.Store(deviceID, &dgTwin)
+			var deviceMutex	sync.Mutex
+			dm.context.DGTwinMutex.Store(deviceID, &deviceMutex)
+			//save to sqlite, implement in future.
+			//Send Response to target.	
+			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", nil)
+			if err != nil {
+				//Internal err.
+				return nil,  err
+			}else{
+				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, \
+						types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+
+				//send the msg to comm module and process it
+				err := dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+				if err != nil {
+					//Internal error, Channel not found
+					return nil, err
+				}
+			}	
+			//notify device	
+			// send broadcast to all device, and wait (own this ID) device's response,
+			// if it has reply, then means that device is online.
+			deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", \
+						types.DGTWINS_OPS_DEVCREATE, "", content)
+
+			err := dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
+			if err != nil {
+				//Internal error, Channel not found
+				return nil, err
+			}  			
+		}else {
+		//Update DGTwin
+		}
+
+	}
+	
 
 	//send the resonpose.
 }
