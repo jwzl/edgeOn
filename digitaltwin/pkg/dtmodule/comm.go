@@ -1,6 +1,7 @@
 package dtmodule
 
 import (
+	"time"
 	"strings"
 	"k8s.io/klog"
 	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
@@ -84,6 +85,9 @@ func (cm *CommModule) Start(){
 				klog.Infof("%s module stopped", cm.Name())
 				return
 			}
+		case time.After(60*time.Second):
+			//check  the MessageCache for response.
+			cm.dealMessageTimeout()	
 		}
 	}
 }
@@ -95,7 +99,10 @@ func (cm *CommModule) sendMessageToDevice(msg *model.Message) {
 	if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
 		//cache this message for confirm recieve the response.
 		id := msg.GetID() 
-		cm.context.MessageCache.Store(id, msg)
+		_, exist := cm.context.MessageCache.Load(id)
+		if !exist {	
+			cm.context.MessageCache.Store(id, msg)
+		}
 	}
 
 	//send message to protocol bus.
@@ -106,7 +113,10 @@ func (cm *CommModule) sendMessageToDevice(msg *model.Message) {
 func (cm *CommModule) sendMessageToHub(msg *model.Message) {
 	//cache this message for confirm recieve the response.
 	id := msg.GetID() 
-	cm.context.MessageCache.Store(id, msg)
+	_, exist := cm.context.MessageCache.Load(id)
+	if !exist {
+		cm.context.MessageCache.Store(id, msg)
+	}
 
 	//send message to message hub.
 	cm.context.Send("hub", msg)
@@ -122,4 +132,29 @@ func (cm *CommModule) dealMessageResponse(msg *model.Message) {
 	if exist {
 		cm.context.MessageCache.Delete(tag) 
 	}	
+}
+
+//dealMessageTimeout
+func (cm *CommModule) dealMessageTimeout() {
+	cm.context.MessageCache.Range(func (key interface{}, value interface{}) bool {
+		msg, isMsgType := value.(*model.Message)
+		if isMsgType {
+			timeStamp := msg.GetTimestamp()/1e3
+			now	:= time.Now().UnixNano() / 1e9
+			if now - timeStamp >= types.DGTWINS_MSG_TIMEOUT {
+				target := message.GetTarget()
+				operation := msg.GetOperation()
+				if strings.Compare("device", target) == 0 {
+					if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
+						//mark device status is offline.
+						//send package and tell twin module, device is offline.
+					}	
+				}
+				cm.context.MessageCache.Delete(key)
+			}else{
+				//resend this message.
+				cm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
+			}
+		}
+	})
 }

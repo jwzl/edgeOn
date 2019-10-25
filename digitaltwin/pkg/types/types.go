@@ -10,6 +10,8 @@ const {
 	DGTWINS_MODULE_TWINS	= "twins"
 	DGTWINS_MODULE_PROPERTY	= "property"
 	DGTWINS_MODULE_COMM	= "comm"
+
+	DGTWINS_MSG_TIMEOUT = 5		//5s 
 }
 // DigitalTwin is a digital description about things in physical world. If you want to do something
 // for things in physical world, you just need to access the digitaltwin. 
