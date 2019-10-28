@@ -1,6 +1,11 @@
 package types
 
-const {
+import (
+	"time"
+	"encoding/json"
+)
+
+const (
 
 	//BadRequestCode sucess
 	RequestSuccessCode= 200 
@@ -13,18 +18,21 @@ const {
 	//InternalErrorCode server internal error
 	InternalErrorCode = 500
 
-	DGTWINS_OPS_TWINSUPDATE	= "TwinsUpdate"
-	DGTWINS_OPS_TWINSUPDATE	= "TwinsDelete"
-	DGTWINS_OPS_TWINSGET	= "TwinsGet"
-	DGTWINS_OPS_RESPONSE	= "Response"
-
 	//Device
 	DGTWINS_OPS_DEVCREATE	= "Create"
-	DGTWINS_OPS_TWINSUPDATE	= "TwinsDelete"
+	DGTWINS_OPS_TWINSUPDATE	= "TwinsUpdate"
 	DGTWINS_OPS_TWINSGET	= "TwinsGet"
 	DGTWINS_OPS_RESPONSE	= "Response"
-}
 
+	//State
+	DGTWINS_STATE_ONLINE	="online"	
+	DGTWINS_STATE_OFFLINE	="offline"
+
+	// Resource
+	DGTWINS_RESOURCE_TWINS	="twins"
+	DGTWINS_RESOURCE_PROPERTY	="property"
+	DGTWINS_RESOURCE_DEVICE	="device"
+)
 
 
 //Create/update/Delete/Get twins message format
@@ -43,7 +51,7 @@ type DGTwinResponse struct{
 }
 
 
-func BuildResponseMessage(code int, reason string, twins  []DigitalTwin) ([]byte error){
+func BuildResponseMessage(code int, reason string, twins  []DigitalTwin) ([]byte, error){
 	now := time.Now().UnixNano() / 1e6
 
 	resp := &DGTwinResponse{
@@ -54,6 +62,20 @@ func BuildResponseMessage(code int, reason string, twins  []DigitalTwin) ([]byte
 	}
 
 	resultJSON, err := json.Marshal(resp)
+
+	return resultJSON, err
+}
+
+func BuildTwinMessage(action string, twins []DigitalTwin) ([]byte, error){
+	now := time.Now().UnixNano() / 1e6
+
+	twinMsg := &DGTwinMessage{
+		Action: action,
+		Timestamp: now,
+		Twins: twins,
+	}
+
+	resultJSON, err := json.Marshal(twinMsg)
 
 	return resultJSON, err
 }

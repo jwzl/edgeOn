@@ -1,18 +1,20 @@
 package dtcontext
 
 import (
-	"fmt"
 	"time"
 	"sync"
 	"errors"
+	"strings"
 	"k8s.io/klog"
-	"github.com/kubeedge/beehive/pkg/core/context"
+	"github.com/jwzl/wssocket/model"
+	"github.com/jwzl/beehive/pkg/core/context"
+	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
 )
 
 type DTContext struct {
 	DeviceID		string
 	Context			*context.Context
-	Modules			map[string]dtmodule.DTModule
+	Modules			map[string]DTModule
 	CommChan		map[string]chan interface{}
 	HeartBeatChan 	map[string]chan interface{}
 	ConfirmChan		chan interface{}
@@ -25,7 +27,7 @@ type DTContext struct {
 }
 
 func NewDTContext(c *context.Context) *DTContext {
-	modules	:= make(map[string]dtmodule.DTModule)
+	modules	:= make(map[string]DTModule)
 	commChan := make(map[string]chan interface{})
 	heartBeatChan:= make(map[string]chan interface{})
 	confirmChan :=	make(chan interface{})
@@ -43,7 +45,7 @@ func NewDTContext(c *context.Context) *DTContext {
 	}
 }
 
-func (dtc *DTContext) RegisterDTModule(dtm dtmodule.DTModule){
+func (dtc *DTContext) RegisterDTModule(dtm DTModule){
 	moduleName := dtm.Name()
 	dtc.CommChan[moduleName] = make(chan interface{}, 128)
 	dtc.HeartBeatChan[moduleName] = make(chan interface{}, 128)
@@ -92,7 +94,7 @@ func (dtc *DTContext) GetMutex (deviceID string) (*sync.Mutex, bool) {
 
 //Lock  device by ID
 func (dtc *DTContext) Lock (deviceID string) bool {
-	mutex, ok := GetMutex(deviceID)
+	mutex, ok := dtc.GetMutex(deviceID)
 	if ok {
 		mutex.Lock()
 		return true
@@ -103,7 +105,7 @@ func (dtc *DTContext) Lock (deviceID string) bool {
 
 //unlock device by ID 
 func (dtc *DTContext) Unlock (deviceID string) bool {
-	mutex, ok := GetMutex(deviceID)
+	mutex, ok := dtc.GetMutex(deviceID)
 	if ok {
 		mutex.Unlock()
 		return true
@@ -119,7 +121,7 @@ func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
 		return false
 	}
 
-	dgtwin, isDGTwin := v.(*types.DigitalTwin)
+	_, isDGTwin := v.(*types.DigitalTwin)
 	if !isDGTwin {
 		return false
 	}
@@ -135,7 +137,7 @@ func (dtc *DTContext) BuildModelMessage(source string, target string, operation 
 	msg.BuildHeader("", now)
 
 	//Router
-	BuildRouter(source, "", target, resource, operation)
+	msg.BuildRouter(source, "", target, resource, operation)
 	
 	//content
 	msg.Content = content
@@ -146,16 +148,4 @@ func (dtc *DTContext) BuildModelMessage(source string, target string, operation 
 //send message to module.
 func (dtc *DTContext) Send(module string, msg *model.Message) {
 	dtc.Context.Send(module, *msg)
-}
-
-func (dtc *DTContext) BuildDTMessage(source string, target string, operation string, resource string, msg *model.Message) *types.DTMessage {
-	dtMsg := &types.DTMessage{
-		Msg: 	msg,
-		Source: source,
-		Target: target,
-		Operation: operation,
-		Resource:  resource, 
-	}
-	
-	return dtMsg
 }

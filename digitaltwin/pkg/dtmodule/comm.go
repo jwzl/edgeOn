@@ -4,6 +4,8 @@ import (
 	"time"
 	"strings"
 	"k8s.io/klog"
+	"github.com/jwzl/wssocket/model"
+	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
 	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
 )
 
@@ -24,14 +26,12 @@ func NewCommModule(name string) *CommModule {
 	return &CommModule{name:name}
 }
 
-
 func (cm *CommModule) Name() string {
 	return cm.name
 }
 
-
 //Init the comm module.
-func (cm *CommModule) Init_Module(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
+func (cm *CommModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
 	cm.context = dtc
 	cm.recieveChan = comm
 	cm.heartBeatChan = heartBeat
@@ -85,7 +85,7 @@ func (cm *CommModule) Start(){
 				klog.Infof("%s module stopped", cm.Name())
 				return
 			}
-		case time.After(60*time.Second):
+		case <-time.After(60*time.Second):
 			//check  the MessageCache for response.
 			cm.dealMessageTimeout()	
 		}
@@ -122,13 +122,13 @@ func (cm *CommModule) sendMessageToHub(msg *model.Message) {
 	cm.context.Send("hub", msg)
 }
 
-// dealMessageResponse
+//dealMessageResponse
 func (cm *CommModule) dealMessageResponse(msg *model.Message) {
 	//If we recieve the response message, then delete cache message.
 	//About the response success/failed, the corresponding resource module
 	// will do these things.	   
 	tag := msg.GetTag()
-	v, exist := cm.context.MessageCache.Load(tag)
+	_ , exist := cm.context.MessageCache.Load(tag)
 	if exist {
 		cm.context.MessageCache.Delete(tag) 
 	}	
@@ -142,19 +142,36 @@ func (cm *CommModule) dealMessageTimeout() {
 			timeStamp := msg.GetTimestamp()/1e3
 			now	:= time.Now().UnixNano() / 1e9
 			if now - timeStamp >= types.DGTWINS_MSG_TIMEOUT {
-				target := message.GetTarget()
+				target := msg.GetTarget()
 				operation := msg.GetOperation()
 				if strings.Compare("device", target) == 0 {
 					if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
 						//mark device status is offline.
 						//send package and tell twin module, device is offline.
+						dgtwin := types.DigitalTwin{
+							ID: msg.GetID(),
+							State:	types.DGTWINS_STATE_OFFLINE,
+						}
+						twins := []types.DigitalTwin{dgtwin}
+						bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
+						if err != nil {
+							return false
+						}
+						modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
+										types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_RESOURCE_TWINS, bytes)
+						
+						cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 					}	
 				}
 				cm.context.MessageCache.Delete(key)
+				return true
 			}else{
 				//resend this message.
 				cm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
+				return true
 			}
 		}
+
+		return false
 	})
 }

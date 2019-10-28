@@ -1,11 +1,16 @@
 package dtmodule
 
 import (
+	"sync"
+	"errors"
 	"k8s.io/klog"
+	"encoding/json"
+	"github.com/jwzl/wssocket/model"
+	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
 	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
 )
 
-type DeviceCommandFunc  func(source string, resource string, msg interface{})(interface{}, error)			
+type DeviceCommandFunc  func(msg interface{})(interface{}, error)			
 //this module process the device Create/delete/update/query.
 type DeviceModule struct {
 	// module name
@@ -27,9 +32,9 @@ func NewDeviceModule(name string) *DeviceModule {
 // Get whole device or device list.
 func (dm *DeviceModule) initDeviceCommandTable() {
 	dm.deviceCommandTbl = make(map[string]DeviceCommandFunc)
-	dm.deviceCommandTbl["Update"] = deviceUpdateHandle
-	dm.deviceCommandTbl["Delete"] = deviceDeleteHandle	
-	dm.deviceCommandTbl["Get"] = deviceGetHandle	
+	dm.deviceCommandTbl["Update"] = dm.deviceUpdateHandle
+	dm.deviceCommandTbl["Delete"] = dm.deviceDeleteHandle	
+	dm.deviceCommandTbl["Get"] = dm.deviceGetHandle	
 }
 
 func (dm *DeviceModule) Name() string {
@@ -37,7 +42,7 @@ func (dm *DeviceModule) Name() string {
 }
 
 //Init the device module.
-func (dm *DeviceModule) Init_Module(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
+func (dm *DeviceModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
 	dm.context = dtc
 	dm.recieveChan = comm
 	dm.heartBeatChan = heartBeat
@@ -60,7 +65,7 @@ func (dm *DeviceModule) Start(){
 			if isDTMsg {
 		 		// do handle.
 				if fn, exist := dm.deviceCommandTbl[message.Operation]; exist {
-					_, err := fn(message.Source, message.Msg)
+					_, err := fn(message.Msg)
 					if err != nil {
 						klog.Errorf("Handle %s failed, ignored", message.Operation)
 					}
@@ -89,8 +94,8 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error
 	if !isMsgType {
 		return nil, errors.New("invaliad message type")
 	}
-	msgRespWhere := msg.GetSource()
-	resource := msg.GetResource()
+	msgRespWhere := message.GetSource()
+	resource := message.GetResource()
 
 	content, ok := message.Content.([]byte)
 	if !ok {
@@ -120,8 +125,8 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error
 				//Internal err.
 				return nil,  err
 			}else{
-				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, \
-						types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
+					types.DGTWINS_OPS_RESPONSE, resource, msgContent)
 				//mark the request message id
 				modelMsg.SetTag(message.GetID())	
 				//send the msg to comm module and process it
@@ -134,22 +139,23 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error
 			//notify device	
 			// send broadcast to all device, and wait (own this ID) device's response,
 			// if it has reply, then means that device is online.
-			deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", \
-						types.DGTWINS_OPS_DEVCREATE, "", content)
+			deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
+						types.DGTWINS_OPS_DEVCREATE, types.DGTWINS_RESOURCE_DEVICE, content)
 
-			err := dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
+			err = dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
 			if err != nil {
 				//Internal error, Channel not found
 				return nil, err
 			}  			
 		}else {
-		//Update DGTwin
+			//Update DGTwin
 		}
 
 	}
 	
 
 	//send the resonpose.
+	return nil, nil
 }
 
 func (dm *DeviceModule)  deviceDeleteHandle(msg interface{}) (interface{}, error) {
@@ -157,6 +163,8 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg interface{}) (interface{}, error
 	if !isMsgType {
 		return nil, errors.New("invaliad message type")
 	}
+
+	return message, nil
 }
 
 func (dm *DeviceModule)  deviceGetHandle(msg interface{}) (interface{}, error) {
@@ -164,4 +172,6 @@ func (dm *DeviceModule)  deviceGetHandle(msg interface{}) (interface{}, error) {
 	if !isMsgType {
 		return nil, errors.New("invaliad message type")
 	}
+
+	return message, nil
 }		
