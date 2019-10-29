@@ -21,6 +21,7 @@ const (
 	//Device
 	DGTWINS_OPS_DEVCREATE	= "Create"
 	DGTWINS_OPS_TWINSUPDATE	= "TwinsUpdate"
+	DGTWINS_OPS_TWINDELETE	= "TwinsDelete"
 	DGTWINS_OPS_TWINSGET	= "TwinsGet"
 	DGTWINS_OPS_RESPONSE	= "Response"
 

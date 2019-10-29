@@ -3,6 +3,7 @@ package dtmodule
 import (
 	"sync"
 	"errors"
+	"strings"
 	"k8s.io/klog"
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
@@ -67,10 +68,10 @@ func (dm *DeviceModule) Start(){
 				if fn, exist := dm.deviceCommandTbl[message.GetOperation()]; exist {
 					_, err := fn(message)
 					if err != nil {
-						klog.Errorf("Handle %s failed, ignored", message.Operation)
+						klog.Errorf("Handle %s failed, ignored", message.GetOperation())
 					}
 				}else {
-					klog.Errorf("No this handle for %s, ignored", message.Operation)
+					klog.Errorf("No this handle for %s, ignored", message.GetOperation())
 				}
 			}
 		case v, ok := <-dm.heartBeatChan:
@@ -125,7 +126,7 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
 					types.DGTWINS_OPS_RESPONSE, resource, msgContent)
 				//mark the request message id
-				modelMsg.SetTag(message.GetID())	
+				modelMsg.SetTag(msg.GetID())	
 				//send the msg to comm module and process it
 				err := dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 				if err != nil {
@@ -157,7 +158,7 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 			}
 
 			//deal device update
-			dm.dealTwinUpdate(oldTwin, dgTwin)
+			dm.dealTwinUpdate(oldTwin, &dgTwin)
 			dm.context.Unlock(deviceID)
 
 			//if message's source is not edge/dgtwin, send response.
@@ -176,12 +177,14 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 			}
 
 			//if the twin has property, let property module to do it.
-			if len(dgTwin.Properties) > 0 {
+			if len(dgTwin.Properties.Desired) > 0 {
 				twins := []types.DigitalTwin{dgTwin}
 				bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
-				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
-										types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_MODULE_PROPERTY, bytes)
-				cm.context.SendToModule(types.DGTWINS_MODULE_PROPERTY, modelMsg)
+				if err == nil {
+					modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
+											types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_MODULE_PROPERTY, bytes)
+					dm.context.SendToModule(types.DGTWINS_MODULE_PROPERTY, modelMsg)
+				}
 			}
 		}
 	}
@@ -217,20 +220,66 @@ func (dm *DeviceModule) dealTwinUpdate(oldTwin, newTwin *types.DigitalTwin) erro
 	return nil
 }
 
-func (dm *DeviceModule)  deviceDeleteHandle(msg interface{}) (interface{}, error) {
-	message, isMsgType := msg.(*model.Message)
-	if !isMsgType {
-		return nil, errors.New("invaliad message type")
+func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, error) {
+	var dgTwinMsg types.DGTwinMessage 
+
+	msgRespWhere := msg.GetSource()
+	resource := msg.GetResource()
+
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		return nil, errors.New("invaliad message content")
 	}
 
-	return message, nil
+	err := json.Unmarshal(content, &dgTwinMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dgTwin := range dgTwinMsg.Twins	{
+		//for each dgtwin
+		var msgContent  []byte
+		deviceID := dgTwin.ID
+		twins := []types.DigitalTwin{dgTwin}
+
+		exist := dm.context.DGTwinIsExist(deviceID)
+		if !exist {
+			msgContent, err = types.BuildResponseMessage(types.NotFoundCode, "Not found", twins)
+			if err != nil {
+				//Internal err.
+				return nil, err
+			}
+		}else {
+			//delete the device & mutex.
+			dm.context.Lock(deviceID)
+			dm.context.DGTwinList.Delete(deviceID)
+			dm.context.Unlock(deviceID)
+			dm.context.DGTwinMutex.Delete(deviceID)
+
+			msgContent, err = types.BuildResponseMessage(types.RequestSuccessCode, "Deleted", twins)
+			if err != nil {
+				//Internal err.
+				return nil, err
+			}
+		}
+
+		modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
+										types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+		dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+
+		//let device know this delete.
+		msgContent, err = types.BuildTwinMessage(types.DGTWINS_OPS_TWINDELETE, twins)
+		if err == nil {
+			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
+										types.DGTWINS_OPS_TWINDELETE, resource, msgContent)
+			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+		}
+	}
+
+	return nil, nil
 }
 
-func (dm *DeviceModule)  deviceGetHandle(msg interface{}) (interface{}, error) {
-	message, isMsgType := msg.(*model.Message)
-	if !isMsgType {
-		return nil, errors.New("invaliad message type")
-	}
-
-	return message, nil
+func (dm *DeviceModule)  deviceGetHandle(msg *model.Message) (interface{}, error) {
+	
+	return nil, nil
 }		
