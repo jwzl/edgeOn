@@ -64,6 +64,7 @@ func (dm *DeviceModule) Start(){
 			
 			message, isMsgType := msg.(*model.Message )
 			if isMsgType {
+				klog.Infof("device module recieved message (%v)", message)
 		 		// do handle.
 				if fn, exist := dm.deviceCommandTbl[message.GetOperation()]; exist {
 					_, err := fn(message)
@@ -127,24 +128,17 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 					types.DGTWINS_OPS_RESPONSE, resource, msgContent)
 				//mark the request message id
 				modelMsg.SetTag(msg.GetID())	
+				klog.Infof("Send response message (%v)", modelMsg)
 				//send the msg to comm module and process it
-				err := dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
-				if err != nil {
-					//Internal error, Channel not found
-					return nil, err
-				}
+				dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 			}	
 			//notify device	
 			// send broadcast to all device, and wait (own this ID) device's response,
 			// if it has reply, then means that device is online.
 			deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
 						types.DGTWINS_OPS_DEVCREATE, types.DGTWINS_RESOURCE_DEVICE, content)
-
-			err = dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
-			if err != nil {
-				//Internal error, Channel not found
-				return nil, err
-			}  			
+			klog.Infof("Send message (%v)", deviceMsg)
+			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)	
 		}else {
 			//Update DGTwin
 			dm.context.Lock(deviceID)
@@ -265,6 +259,7 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 
 		modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
 										types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+		klog.Infof("Send response message (%v)", modelMsg)
 		dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 
 		//let device know this delete.
@@ -272,6 +267,7 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 		if err == nil {
 			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
 										types.DGTWINS_OPS_TWINDELETE, resource, msgContent)
+			klog.Infof("Send device message (%v) ", modelMsg)
 			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 		}
 	}
@@ -280,6 +276,59 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 }
 
 func (dm *DeviceModule)  deviceGetHandle(msg *model.Message) (interface{}, error) {
-	
+	var dgTwinMsg types.DGTwinMessage 
+	twins := make([]types.DigitalTwin, 0)
+
+	msgRespWhere := msg.GetSource()
+	resource := msg.GetResource()
+
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		return nil, errors.New("invaliad message content")
+	}
+
+	err := json.Unmarshal(content, &dgTwinMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dgTwin := range dgTwinMsg.Twins	{
+		//for each dgtwin
+		deviceID := dgTwin.ID
+
+		exist := dm.context.DGTwinIsExist(deviceID)
+		if exist {
+			v, _ := dm.context.DGTwinList.Load(deviceID)
+			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
+			if !isDgTwinType {
+				return nil,  errors.New("invalud digital twin type")
+			}
+			twins = append(twins, *savedTwin)
+		}else {
+			twins := []types.DigitalTwin{dgTwin}
+			msgContent, err := types.BuildResponseMessage(types.NotFoundCode, "Not found", twins)
+			if err != nil {
+				//Internal err.
+				return nil, err
+			}
+			
+			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
+										types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+			return nil, nil
+		}
+	}
+
+	//Send the response.
+	msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Get", twins)
+	if err != nil {
+		//Internal err.
+		return nil, err
+	}
+	modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
+										types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+	klog.Infof("Send message (%v)", modelMsg)
+	dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+
 	return nil, nil
 }		

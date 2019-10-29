@@ -33,6 +33,8 @@ func NewDTContext(c *context.Context) *DTContext {
 	confirmChan :=	make(chan interface{})
 	var modulesHealth sync.Map
 	var messageCache sync.Map
+	var dgTwinList sync.Map
+	var dgTwinMutex sync.Map
 
 	return &DTContext{
 		Context:	c,
@@ -42,6 +44,8 @@ func NewDTContext(c *context.Context) *DTContext {
 		ConfirmChan:	confirmChan,
 		ModuleHealth:	&modulesHealth,
 		MessageCache:   &messageCache,
+		DGTwinList: 	&dgTwinList,
+		DGTwinMutex:	&dgTwinMutex,
 	}
 }
 

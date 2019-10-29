@@ -40,6 +40,7 @@ func (cm *CommModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, conf
 }
 
 //Start comm module
+//TODO: Device should has a healthcheck.
 func (cm *CommModule) Start(){
 	//Start loop.
 	for {
