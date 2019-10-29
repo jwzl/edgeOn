@@ -29,7 +29,7 @@ type DigitalTwin struct {
 	// device last state
 	LastState	string	`json:"laststate,omitempty"`
 	// device metadata  
-	MetaData	map[string]PropertyValue	`json:"metadata,omitempty"`
+	MetaData	map[string]string	`json:"metadata,omitempty"`
 	//all properties
 	Properties	TwinProperties			`json:"properties,omitempty"`	
 }

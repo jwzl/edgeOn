@@ -42,5 +42,6 @@ func TestStart(t *testing.T) {
 		heartBeat <- "ping"
 	})
 
+	t.Log("recieve message")
 	heartBeat <- "stop"
 }

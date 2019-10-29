@@ -10,7 +10,7 @@ import (
 	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
 )
 
-type DeviceCommandFunc  func(msg interface{})(interface{}, error)			
+type DeviceCommandFunc  func(msg *model.Message )(interface{}, error)			
 //this module process the device Create/delete/update/query.
 type DeviceModule struct {
 	// module name
@@ -61,11 +61,11 @@ func (dm *DeviceModule) Start(){
 				return
 			}
 			
-			message, isDTMsg := msg.(*types.DTMessage)
-			if isDTMsg {
+			message, isMsgType := msg.(*model.Message )
+			if isMsgType {
 		 		// do handle.
-				if fn, exist := dm.deviceCommandTbl[message.Operation]; exist {
-					_, err := fn(message.Msg)
+				if fn, exist := dm.deviceCommandTbl[message.GetOperation()]; exist {
+					_, err := fn(message)
 					if err != nil {
 						klog.Errorf("Handle %s failed, ignored", message.Operation)
 					}
@@ -88,16 +88,13 @@ func (dm *DeviceModule) Start(){
 }
 
 // handle device create and update.
-func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error) {
+func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, error) {
 	var dgTwinMsg types.DGTwinMessage 
-	message, isMsgType := msg.(*model.Message)
-	if !isMsgType {
-		return nil, errors.New("invaliad message type")
-	}
-	msgRespWhere := message.GetSource()
-	resource := message.GetResource()
 
-	content, ok := message.Content.([]byte)
+	msgRespWhere := msg.GetSource()
+	resource := msg.GetResource()
+
+	content, ok := msg.Content.([]byte)
 	if !ok {
 		return nil, errors.New("invaliad message content")
 	}
@@ -149,13 +146,75 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg interface{}) (interface{}, error
 			}  			
 		}else {
 			//Update DGTwin
-		}
+			dm.context.Lock(deviceID)
+			v, exist := dm.context.DGTwinList.Load(deviceID)
+			if !exist {
+				return nil, errors.New("No such dgtwin in DGTwinList")
+			}
+			oldTwin, isDgTwinType  :=v.(*types.DigitalTwin)
+			if !isDgTwinType {
+				return nil,  errors.New("invalud digital twin type")
+			}
 
+			//deal device update
+			dm.dealTwinUpdate(oldTwin, dgTwin)
+			dm.context.Unlock(deviceID)
+
+			//if message's source is not edge/dgtwin, send response.
+			if strings.Compare(msgRespWhere, types.MODULE_NAME) != 0 {
+				msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", nil)
+				if err != nil {
+					//Internal err.
+					return nil,  err
+				}else{
+					modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
+												types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+					//mark the request message id
+					modelMsg.SetTag(msg.GetID())
+					dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+				}	
+			}
+
+			//if the twin has property, let property module to do it.
+			if len(dgTwin.Properties) > 0 {
+				twins := []types.DigitalTwin{dgTwin}
+				bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
+				modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
+										types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_MODULE_PROPERTY, bytes)
+				cm.context.SendToModule(types.DGTWINS_MODULE_PROPERTY, modelMsg)
+			}
+		}
 	}
 	
-
-	//send the resonpose.
 	return nil, nil
+}
+
+//deal twin update.
+//this is a patch for the old device state.
+func (dm *DeviceModule) dealTwinUpdate(oldTwin, newTwin *types.DigitalTwin) error {
+	if oldTwin == nil || newTwin == nil {
+		return errors.New("error oldTwin or newTwin")
+	}
+
+	klog.Infof("old twin =(%v), newTwin =(%v)", oldTwin, newTwin)
+	if len(newTwin.Name) > 0 {
+		oldTwin.Name = newTwin.Name
+	}
+	if len(newTwin.Description) > 0 {
+		oldTwin.Description = newTwin.Description
+	}
+	if len(newTwin.State) > 0 {
+		oldTwin.LastState = oldTwin.State 
+		oldTwin.State = newTwin.State		
+	}
+	//patch all metadata to oldTwin. 
+	if len(newTwin.MetaData) > 0 {
+		for key, value := range newTwin.MetaData {
+			oldTwin.MetaData[key] = value
+		}
+	}
+
+	return nil
 }
 
 func (dm *DeviceModule)  deviceDeleteHandle(msg interface{}) (interface{}, error) {
