@@ -111,9 +111,41 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 		deviceID := dgTwin.ID
 		exist := dm.context.DGTwinIsExist(deviceID)
 		if !exist {
-		
+			// Device has not created yet.
+			twins := []types.DigitalTwin{dgTwin}
+			msgContent, err = types.BuildResponseMessage(types.NotFoundCode, "Twin Not found", twins)
+			if err != nil {
+				return err
+			}
+			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
+										types.DGTWINS_OPS_RESPONSE, resource, msgContent)
+			klog.Infof("Send response message (%v)", modelMsg)
+			pm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 		}else{
+			dm.context.Lock(deviceID)
+			v, _ := dm.context.DGTwinList.Load(deviceID)
+			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
+			if !isDgTwinType {
+				return errors.New("invalud digital twin type")
+			}
+ 	
+			savedDesired  := savedTwin.Properties.Desired
+			savedReported := savedTwin.Properties.Reported
+			newDesired := dgTwin.Properties.Desired
+			newReported := 	dgTwin.Properties.Reported
+			//Update twin property.
+			for key, value := range newDesired {
+				savedDesired[key] = value
+			}
+		
+			for key, value := range newReported {
+				savedReported[key] = value
+			}
+			dm.context.Unlock(deviceID)
 
+			//Send the response
+
+			// notify the device.
 		}
 	}
 }
