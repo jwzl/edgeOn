@@ -21,6 +21,8 @@ type DTContext struct {
 
 	ModuleHealth	*sync.Map
 	MessageCache	*sync.Map
+	//this is for mark watch event.
+	WatchCache	*sync.Map
 	// Cache for digitaltwin	
 	DGTwinList	*sync.Map
 	DGTwinMutex	*sync.Map	

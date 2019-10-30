@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewDeviceModule(t *testing.T) {
-	deviceModule := NewDeviceModule("device")
+	deviceModule := NewDeviceModule()
 	if deviceModule == nil {
 		t.Fatal("Failed to create device module.")
 	}
@@ -22,7 +22,7 @@ func TestNewDeviceModule(t *testing.T) {
 func TestCreateTwin(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	deviceModule := NewDeviceModule("device")
+	deviceModule := NewDeviceModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -36,10 +36,10 @@ func TestCreateTwin(t *testing.T) {
 		State: "offline",
 	}
 	twins := []types.DigitalTwin{dgTwin}
-	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
+	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
-							types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_MODULE_TWINS, bytes)
+							types.DGTWINS_OPS_UPDATE, types.DGTWINS_MODULE_TWINS, bytes)
 		comm <- modelMsg
 		heartBeat <- "ping"
 	}
@@ -61,7 +61,7 @@ func TestCreateTwin(t *testing.T) {
 func TestUpdateTwin(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	deviceModule := NewDeviceModule("device")
+	deviceModule := NewDeviceModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -86,10 +86,10 @@ func TestUpdateTwin(t *testing.T) {
 		State: "offline",
 	}
 	twins := []types.DigitalTwin{newTwin}
-	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
+	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
-							types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_MODULE_TWINS, bytes)
+							types.DGTWINS_OPS_UPDATE, types.DGTWINS_MODULE_TWINS, bytes)
 		comm <- modelMsg
 		heartBeat <- "ping"
 	}
@@ -121,7 +121,7 @@ func TestUpdateTwin(t *testing.T) {
 func TestDeleteTwin(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	deviceModule := NewDeviceModule("device")
+	deviceModule := NewDeviceModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -143,10 +143,10 @@ func TestDeleteTwin(t *testing.T) {
 		ID:	"dev001",
 	}
 	twins := []types.DigitalTwin{newTwin}
-	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINDELETE, twins)
+	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_DELETE, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
-							types.DGTWINS_OPS_TWINDELETE, types.DGTWINS_MODULE_TWINS, bytes)
+							types.DGTWINS_OPS_DELETE, types.DGTWINS_MODULE_TWINS, bytes)
 		comm <- modelMsg
 		heartBeat <- "ping"
 	}
@@ -174,7 +174,7 @@ func TestGetTwin(t *testing.T) {
 	dtcontext := dtcontext.NewDTContext(ctx)
 	dtcontext.CommChan["comm"] = make(chan interface{}, 128)
 	dtcontext.HeartBeatChan["comm"] = make(chan interface{}, 128)
-	deviceModule := NewDeviceModule("device")
+	deviceModule := NewDeviceModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -210,10 +210,10 @@ func TestGetTwin(t *testing.T) {
 	}
 
 	twins := []types.DigitalTwin{newTwin, newTwin2}
-	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSGET, twins)
+	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_GET, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
-							types.DGTWINS_OPS_TWINSGET, types.DGTWINS_MODULE_TWINS, bytes)
+							types.DGTWINS_OPS_GET, types.DGTWINS_MODULE_TWINS, bytes)
 		comm <- modelMsg
 		heartBeat <- "ping"
 	}

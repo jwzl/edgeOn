@@ -25,8 +25,8 @@ type DeviceModule struct {
 	deviceCommandTbl 	map[string]DeviceCommandFunc
 }
 
-func NewDeviceModule(name string) *DeviceModule {
-	return &DeviceModule{name:name}
+func NewDeviceModule() *DeviceModule {
+	return &DeviceModule{name: types.DGTWINS_MODULE_TWINS}
 }
 
 // Device command include: create/delete, update whole device, 
@@ -136,7 +136,7 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 			// send broadcast to all device, and wait (own this ID) device's response,
 			// if it has reply, then means that device is online.
 			deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
-						types.DGTWINS_OPS_DEVCREATE, types.DGTWINS_RESOURCE_DEVICE, content)
+						types.DGTWINS_OPS_CREATE, types.DGTWINS_RESOURCE_DEVICE, content)
 			klog.Infof("Send message (%v)", deviceMsg)
 			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)	
 		}else {
@@ -173,10 +173,10 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 			//if the twin has property, let property module to do it.
 			if len(dgTwin.Properties.Desired) > 0 {
 				twins := []types.DigitalTwin{dgTwin}
-				bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
+				bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 				if err == nil {
 					modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
-											types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_MODULE_PROPERTY, bytes)
+											types.DGTWINS_OPS_UPDATE, types.DGTWINS_MODULE_PROPERTY, bytes)
 					dm.context.SendToModule(types.DGTWINS_MODULE_PROPERTY, modelMsg)
 				}
 			}
@@ -263,10 +263,10 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 		dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 
 		//let device know this delete.
-		msgContent, err = types.BuildTwinMessage(types.DGTWINS_OPS_TWINDELETE, twins)
+		msgContent, err = types.BuildTwinMessage(types.DGTWINS_OPS_DELETE, twins)
 		if err == nil {
 			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
-										types.DGTWINS_OPS_TWINDELETE, resource, msgContent)
+										types.DGTWINS_OPS_DELETE, resource, msgContent)
 			klog.Infof("Send device message (%v) ", modelMsg)
 			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 		}
@@ -275,7 +275,7 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 	return nil, nil
 }
 
-func (dm *DeviceModule)  deviceGetHandle(msg *model.Message) (interface{}, error) {
+func (dm *DeviceModule) deviceGetHandle(msg *model.Message) (interface{}, error) {
 	var dgTwinMsg types.DGTwinMessage 
 	twins := make([]types.DigitalTwin, 0)
 

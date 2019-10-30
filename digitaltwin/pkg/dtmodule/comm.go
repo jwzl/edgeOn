@@ -22,8 +22,8 @@ type CommModule struct {
 	CommandTbl 	map[string]CommandFunc
 }
 
-func NewCommModule(name string) *CommModule {
-	return &CommModule{name:name}
+func NewCommModule() *CommModule {
+	return &CommModule{name: types.DGTWINS_MODULE_COMM}
 }
 
 func (cm *CommModule) Name() string {
@@ -154,12 +154,12 @@ func (cm *CommModule) dealMessageTimeout() {
 							State:	types.DGTWINS_STATE_OFFLINE,
 						}
 						twins := []types.DigitalTwin{dgtwin}
-						bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_TWINSUPDATE, twins)
+						bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 						if err != nil {
 							return false
 						}
 						modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
-										types.DGTWINS_OPS_TWINSUPDATE, types.DGTWINS_RESOURCE_TWINS, bytes)
+										types.DGTWINS_OPS_UPDATE, types.DGTWINS_RESOURCE_TWINS, bytes)
 						
 						cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 					}	

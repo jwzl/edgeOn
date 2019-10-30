@@ -18,12 +18,15 @@ const (
 	//InternalErrorCode server internal error
 	InternalErrorCode = 500
 
-	//Device
-	DGTWINS_OPS_DEVCREATE	= "Create"
-	DGTWINS_OPS_TWINSUPDATE	= "Update"
-	DGTWINS_OPS_TWINDELETE	= "Delete"
-	DGTWINS_OPS_TWINSGET	= "Get"
+	//twin's verb
+	DGTWINS_OPS_UPDATE		= "Update"
+	DGTWINS_OPS_DELETE		= "Delete"
+	DGTWINS_OPS_GET			= "Get"
 	DGTWINS_OPS_RESPONSE	= "Response"
+	DGTWINS_OPS_WATCH		= "Watch"
+	//device's verb	
+	DGTWINS_OPS_CREATE		= "Create"
+	DGTWINS_OPS_SYNC		= "Sync"
 
 	//State
 	DGTWINS_STATE_ONLINE	="online"	

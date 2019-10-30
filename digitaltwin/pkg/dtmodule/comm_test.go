@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewCommModule(t *testing.T) {
-	commModule := NewCommModule("comm")
+	commModule := NewCommModule()
 	if commModule == nil {
 		t.Fatal("Failed to create comm module.")
 	}
@@ -18,14 +18,14 @@ func TestNewCommModule(t *testing.T) {
 func TestStart(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	commModule := NewCommModule("comm_test")
+	commModule := NewCommModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 	
 	commModule.InitModule(dtcontext, comm, heartBeat, nil) 
 
 	modelMsg := dtcontext.BuildModelMessage(types.MODULE_NAME, "device", 
-					types.DGTWINS_OPS_TWINSGET, types.DGTWINS_RESOURCE_DEVICE, "helloworld") 
+					types.DGTWINS_OPS_GET, types.DGTWINS_RESOURCE_DEVICE, "helloworld") 
 	modelMsg.Header.ID ="message"
 
 	//send message
