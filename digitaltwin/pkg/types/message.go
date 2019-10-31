@@ -43,7 +43,7 @@ const (
 type DGTwinMessage struct{
 	Action	string			`json:"action,omitempty"`
 	Timestamp int64  		`json:"timestamp"`		
-	Twins  []DigitalTwin 	`json:"twins"`
+	Twins  []*DigitalTwin 	`json:"twins"`
 }
 
 // Response message format
@@ -51,11 +51,11 @@ type DGTwinResponse struct{
 	Code   int    			`json:"code"`
 	Reason string 			`json:"reason,omitempty"`
 	Timestamp int64  		`json:"timestamp"`	
-	Twins  []DigitalTwin	`json:"twins,omitempty"`
+	Twins  []*DigitalTwin	`json:"twins,omitempty"`
 }
 
 
-func BuildResponseMessage(code int, reason string, twins  []DigitalTwin) ([]byte, error){
+func BuildResponseMessage(code int, reason string, twins  []*DigitalTwin) ([]byte, error){
 	now := time.Now().UnixNano() / 1e6
 
 	resp := &DGTwinResponse{
@@ -70,7 +70,7 @@ func BuildResponseMessage(code int, reason string, twins  []DigitalTwin) ([]byte
 	return resultJSON, err
 }
 
-func BuildTwinMessage(action string, twins []DigitalTwin) ([]byte, error){
+func BuildTwinMessage(action string, twins []*DigitalTwin) ([]byte, error){
 	now := time.Now().UnixNano() / 1e6
 
 	twinMsg := &DGTwinMessage{

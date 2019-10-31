@@ -29,13 +29,13 @@ func TestCreateTwin(t *testing.T) {
 	deviceModule.InitModule(dtcontext, comm, heartBeat, nil)
 	t.Log("Start test CreateTwin")
 
-	dgTwin := types.DigitalTwin{
+	dgTwin := &types.DigitalTwin{
 		ID:	"dev001",
 		Name:	"sensor0",
 		Description: "None",
 		State: "offline",
 	}
-	twins := []types.DigitalTwin{dgTwin}
+	twins := []*types.DigitalTwin{dgTwin}
 	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
@@ -68,24 +68,24 @@ func TestUpdateTwin(t *testing.T) {
 	deviceModule.InitModule(dtcontext, comm, heartBeat, nil)
 	t.Log("Start test UpdateTwin")
 
-	dgTwin := types.DigitalTwin{
+	dgTwin := &types.DigitalTwin{
 		ID:	"dev001",
 		Name:	"sensor0",
 		Description: "None",
 		State: "offline",
 	}
 	// Store the twin
-	dtcontext.DGTwinList.Store("dev001", &dgTwin)
+	dtcontext.DGTwinList.Store("dev001", dgTwin)
 	var deviceMutex	sync.Mutex
 	dtcontext.DGTwinMutex.Store("dev001", &deviceMutex)
 
-	newTwin := types.DigitalTwin{
+	newTwin := &types.DigitalTwin{
 		ID:	"dev001",
 		Name:	"sensor1",
 		Description: "",
 		State: "offline",
 	}
-	twins := []types.DigitalTwin{newTwin}
+	twins := []*types.DigitalTwin{newTwin}
 	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
@@ -128,21 +128,21 @@ func TestDeleteTwin(t *testing.T) {
 	deviceModule.InitModule(dtcontext, comm, heartBeat, nil)
 	t.Log("Start test DeleteTwin")
 
-	dgTwin := types.DigitalTwin{
+	dgTwin := &types.DigitalTwin{
 		ID:	"dev001",
 		Name:	"sensor0",
 		Description: "None",
 		State: "offline",
 	}
 	// Store the twin
-	dtcontext.DGTwinList.Store("dev001", &dgTwin)
+	dtcontext.DGTwinList.Store("dev001", dgTwin)
 	var deviceMutex	sync.Mutex
 	dtcontext.DGTwinMutex.Store("dev001", &deviceMutex)
 
-	newTwin := types.DigitalTwin{
+	newTwin := &types.DigitalTwin{
 		ID:	"dev001",
 	}
-	twins := []types.DigitalTwin{newTwin}
+	twins := []*types.DigitalTwin{newTwin}
 	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_DELETE, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 
@@ -181,35 +181,35 @@ func TestGetTwin(t *testing.T) {
 	deviceModule.InitModule(dtcontext, comm, heartBeat, nil)
 	t.Log("Start test DeleteTwin")
 
-	dgTwin := types.DigitalTwin{
+	dgTwin := &types.DigitalTwin{
 		ID:	"dev001",
 		Name:	"sensor0",
 		Description: "None",
 		State: "offline",
 	}
-	dgTwin2 := types.DigitalTwin{
+	dgTwin2 := &types.DigitalTwin{
 		ID:	"dev002",
 		Name:	"sensor1",
 		Description: "None",
 		State: "offline",
 	}
 	// Store the twin
-	dtcontext.DGTwinList.Store("dev001", &dgTwin)
+	dtcontext.DGTwinList.Store("dev001", dgTwin)
 	var deviceMutex	sync.Mutex
 	dtcontext.DGTwinMutex.Store("dev001", &deviceMutex)
-	dtcontext.DGTwinList.Store("dev002", &dgTwin2)
+	dtcontext.DGTwinList.Store("dev002", dgTwin2)
 	var deviceMutex2	sync.Mutex
 	dtcontext.DGTwinMutex.Store("dev002", &deviceMutex2)
 
 	
-	newTwin := types.DigitalTwin{
+	newTwin := &types.DigitalTwin{
 		ID:	"dev001",
 	}
-	newTwin2 := types.DigitalTwin{
+	newTwin2 := &types.DigitalTwin{
 		ID:	"dev002",
 	}
 
-	twins := []types.DigitalTwin{newTwin, newTwin2}
+	twins := []*types.DigitalTwin{newTwin, newTwin2}
 	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_GET, twins)
 	if err == nil {
 		modelMsg := dtcontext.BuildModelMessage("edge/app", types.MODULE_NAME, 

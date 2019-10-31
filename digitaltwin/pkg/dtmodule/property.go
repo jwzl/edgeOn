@@ -1,9 +1,9 @@
 package dtmodule
 
 import (
-	"sync"
+	_"sync"
 	"errors"
-	"strings"
+	_"strings"
 	"k8s.io/klog"
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
@@ -88,9 +88,6 @@ func (pm *PropertyModule) Start() {
 func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 	var dgTwinMsg types.DGTwinMessage 
 
-	msgRespWhere := msg.GetSource()
-	resource := msg.GetResource()
-
 	content, ok := msg.Content.([]byte)
 	if !ok {
 		return errors.New("invaliad message content")
@@ -109,21 +106,18 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 	}
 	for _, dgTwin := range dgTwinMsg.Twins	{
 		deviceID := dgTwin.ID
-		exist := dm.context.DGTwinIsExist(deviceID)
+		exist := pm.context.DGTwinIsExist(deviceID)
 		if !exist {
 			// Device has not created yet.
-			twins := []types.DigitalTwin{dgTwin}
-			msgContent, err = types.BuildResponseMessage(types.NotFoundCode, "Twin Not found", twins)
+			twins := []*types.DigitalTwin{dgTwin}
+			msgContent, err := types.BuildResponseMessage(types.NotFoundCode, "Twin Not found", twins)
 			if err != nil {
 				return err
 			}
-			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, msgRespWhere, 
-										types.DGTWINS_OPS_RESPONSE, resource, msgContent)
-			klog.Infof("Send response message (%v)", modelMsg)
-			pm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+			pm.context.SendResponseMessage(msg, msgContent)
 		}else{
-			dm.context.Lock(deviceID)
-			v, _ := dm.context.DGTwinList.Load(deviceID)
+			pm.context.Lock(deviceID)
+			v, _ := pm.context.DGTwinList.Load(deviceID)
 			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
 			if !isDgTwinType {
 				return errors.New("invalud digital twin type")
@@ -141,26 +135,35 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 			for key, value := range newReported {
 				savedReported[key] = value
 			}
-			dm.context.Unlock(deviceID)
+			pm.context.Unlock(deviceID)
 
 			//Send the response
+			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", dgTwinMsg.Twins)
+			if err != nil {
+				return err
+			}else{
+				//send the msg to comm module and process it
+				pm.context.SendResponseMessage(msg, msgContent)
+			}
 
-			// notify the device.
+			// notify the device.	
 		}
 	}
+	return nil
 }
 func (pm *PropertyModule) propDeleteHandle(msg *model.Message ) error {
 
+	return nil
 }
 
 func (pm *PropertyModule) propGetHandle (msg *model.Message ) error {
-
+	return nil
 }
 
 func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
-
+	return nil
 }
 
 func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
-
+	return nil
 }

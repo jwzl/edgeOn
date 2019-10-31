@@ -31,13 +31,13 @@ type DigitalTwin struct {
 	// device metadata  
 	MetaData	map[string]string	`json:"metadata,omitempty"`
 	//all properties
-	Properties	TwinProperties			`json:"properties,omitempty"`	
+	Properties	*TwinProperties			`json:"properties,omitempty"`	
 }
 
 // all Desired and Reported are in TwinProperties.
 type TwinProperties struct {
-	Desired  map[string]PropertyValue		`json:"desired,omitempty"`
-	Reported map[string]PropertyValue			`json:"reported,omitempty"`	
+	Desired  map[string]*PropertyValue		`json:"desired,omitempty"`
+	Reported map[string]*PropertyValue			`json:"reported,omitempty"`	
 }
 
 type PropertyValue struct {

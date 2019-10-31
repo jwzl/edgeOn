@@ -149,11 +149,11 @@ func (cm *CommModule) dealMessageTimeout() {
 					if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
 						//mark device status is offline.
 						//send package and tell twin module, device is offline.
-						dgtwin := types.DigitalTwin{
+						dgtwin := &types.DigitalTwin{
 							ID: msg.GetID(),
 							State:	types.DGTWINS_STATE_OFFLINE,
 						}
-						twins := []types.DigitalTwin{dgtwin}
+						twins := []*types.DigitalTwin{dgtwin}
 						bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
 						if err != nil {
 							return false

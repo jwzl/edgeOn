@@ -155,3 +155,16 @@ func (dtc *DTContext) BuildModelMessage(source string, target string, operation 
 func (dtc *DTContext) Send(module string, msg *model.Message) {
 	dtc.Context.Send(module, *msg)
 }
+
+//Send Response conten.
+func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []byte){
+	target := requestMsg.GetSource()
+	resource := requestMsg.GetResource()
+
+	modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, target, 
+					types.DGTWINS_OPS_RESPONSE, resource, content)	
+	modelMsg.SetTag(requestMsg.GetID())	
+	klog.Infof("Send response message (%v)", modelMsg)
+
+	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+}
