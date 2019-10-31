@@ -188,8 +188,8 @@ func (pm *PropertyModule) handleMessage (msg *model.Message, fn PropActionHandle
 			klog.Infof("Twin is nil, Ignored")
 			continue
 		}
-		deviceID := dgTwin.ID
-		exist := pm.context.DGTwinIsExist(deviceID)
+		twinID := dgTwin.ID
+		exist := pm.context.DGTwinIsExist(twinID)
 		if !exist {
 			// Device has not created yet.
 			twins := []*types.DigitalTwin{dgTwin}
@@ -199,7 +199,7 @@ func (pm *PropertyModule) handleMessage (msg *model.Message, fn PropActionHandle
 			}
 			pm.context.SendResponseMessage(msg, msgContent)
 		}else{
-			v, _ := pm.context.DGTwinList.Load(deviceID)
+			v, _ := pm.context.DGTwinList.Load(twinID)
 			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
 			if !isDgTwinType {
 				return errors.New("invalud digital twin type")
