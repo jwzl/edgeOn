@@ -156,7 +156,7 @@ func (dtc *DTContext) Send(module string, msg *model.Message) {
 	dtc.Context.Send(module, *msg)
 }
 
-//Send Response conten.
+//SendResponseMessage Send Response conten.
 func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []byte){
 	target := requestMsg.GetSource()
 	resource := requestMsg.GetResource()
@@ -168,3 +168,21 @@ func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []b
 
 	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 }
+
+//SendTwinMessage2Device Send twin message to device.
+func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action string, twins []*types.DigitalTwin) error {
+	resource := requestMsg.GetResource()
+
+	msgContent, err := types.BuildTwinMessage(action, twins)
+	if err == nil {
+		modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, "device", 
+												action, resource, msgContent)
+		klog.Infof("Send device message (%v) ", modelMsg)
+		dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+		
+		return nil
+	}
+	
+	return err
+}
+

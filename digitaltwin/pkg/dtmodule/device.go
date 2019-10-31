@@ -206,8 +206,6 @@ func (dm *DeviceModule) dealTwinUpdate(oldTwin, newTwin *types.DigitalTwin) erro
 func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, error) {
 	var dgTwinMsg types.DGTwinMessage 
 
-
-	resource := msg.GetResource()
 	content, ok := msg.Content.([]byte)
 	if !ok {
 		return nil, errors.New("invaliad message content")
@@ -247,13 +245,7 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 		dm.context.SendResponseMessage(msg, msgContent)
 
 		//let device know this delete.
-		msgContent, err = types.BuildTwinMessage(types.DGTWINS_OPS_DELETE, twins)
-		if err == nil {
-			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
-										types.DGTWINS_OPS_DELETE, resource, msgContent)
-			klog.Infof("Send device message (%v) ", modelMsg)
-			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
-		}
+		dm.context.SendTwinMessage2Device(msg, types.DGTWINS_OPS_DELETE, twins)
 	}
 
 	return nil, nil
