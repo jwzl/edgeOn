@@ -267,9 +267,82 @@ func (pm *PropertyModule) propGetHandle (msg *model.Message ) error {
 	})
 }
 
+// propWatchHandle: handle property watch.
+// We don't know we send the property's update to who , since there are 2 reciever(cloud and edge/app)
+// So reciever must call watch to recieve these twin properties 's update.
+// If Properties is nil or no  properties in request message, we consider it to watch all properties of 
+// this twin.
 func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
+		twinID := savedTwin.ID 
+		if savedTwin.Properties == nil || len(savedTwin.Properties.Reported) > 0 {
+			twins := []*types.DigitalTwin{msgTwin}
+			msgContent, err := types.BuildResponseMessage(types.NotFoundCode, "twin No property", twins)
+			if err != nil {
+				return err
+			}
+			pm.context.SendResponseMessage(msg, msgContent)
+		}else {
+			watchEvent := types.CreateWatchEvent(msg.GetID(), twinID, msg.GetSource(), msg.GetResource())
 
+			pm.context.Lock(twinID)
+
+			savedReported := savedTwin.Properties.Reported	
+			newReported := msgTwin.Properties.Reported
+			reportedProps := make(map[string]*types.PropertyValue)
+
+			if msgTwin.Properties == nil || len(msgTwin.Properties.Reported) < 1 {
+				reportedProps = savedReported
+				for propName, _ := range savedReported {
+					append(watchEvent.List, propName)
+				}
+			}else {				
+				for propName, _:= range newReported {
+					if value, exist := savedReported[key]; !exist {
+						reportedProps[key] = nil
+						twinProperties:= &types.TwinProperties{
+							Reported: reportedProps,
+						}
+						msgTwin.Properties = twinProperties
+						msgTwin.State = savedTwin.State 
+					
+						pm.context.Unlock(twinID)
+	
+						twins := []*types.DigitalTwin{msgTwin}
+						msgContent, err := types.BuildResponseMessage(types.NotFoundCode,
+																 "twin No this property", twins)
+						if err != nil {
+							return err
+						}
+						pm.context.SendResponseMessage(msg, msgContent)						
+
+						return nil
+					}else {
+						append(watchEvent.List, propName)
+						reportedProps[key] = value
+					}
+				}		
+			}
+
+			twinProperties:= &types.TwinProperties{
+				Reported: reportedProps,
+			}
+			msgTwin.Properties = twinProperties
+			msgTwin.State = savedTwin.State
+
+			pm.context.Unlock(twinID)
+		
+			twins := []*types.DigitalTwin{msgTwin}
+			//TODO: maybe we shuold replace by SYNC.
+			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
+			if err != nil {
+				return err
+			}
+			pm.context.SendResponseMessage(msg, msgContent)
+
+			//Cache the watch event
+			pm.context.UpdateWatchCache(watchEvent)
+		}
 
 		return nil
 	})

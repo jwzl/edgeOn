@@ -21,7 +21,7 @@ type DTContext struct {
 
 	ModuleHealth	*sync.Map
 	MessageCache	*sync.Map
-	//this is for mark watch event.
+	//this is for watch event.
 	WatchCache	*sync.Map
 	// Cache for digitaltwin	
 	DGTwinList	*sync.Map
@@ -184,5 +184,25 @@ func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action s
 	}
 	
 	return err
+}
+
+func (dtc *DTContext) UpdateWatchCache(we *types.WatchEvent) {
+
+	if we == nil {
+		return 
+	}
+
+	if dtc.WatchCache == nil {
+		var watchCache	sync.Map
+		dtc.WatchCache = &watchCache
+	}
+
+	v, exist := dtc.WatchCache.Load(we.TwinID)
+	if !exist {
+		dtc.ModuleHealth.Store(we.TwinID, we)
+	}else{
+	
+
+	}
 }
 

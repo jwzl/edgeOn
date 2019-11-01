@@ -54,6 +54,27 @@ type DTMessage struct {
 	Target 		string
 	Operation   string
 }
+
+type WatchEvent	struct {
+	MsgID		string
+	TwinID		string
+	// message's source 
+	Source 		string	
+	// message's resource
+	Resource 	string
+	//Slice for watch's property/attributes.  
+	List		[]string	
+}
+
+func CreateWatchEvent(msgID, twinID, source, resource string) *WatchEvent {
+	return &WatchEvent{
+		MsgID:	msgID,
+		TwinID:	twinID,
+		Source: source,
+		Resource: resource,
+		List: 	make([]string, 0),
+	}
+}
 //Back-end opertaion
 //1. Retrieve digital twin by ID.
 //2. Partially update digital twin. 
