@@ -201,8 +201,21 @@ func (dtc *DTContext) UpdateWatchCache(we *types.WatchEvent) {
 	if !exist {
 		dtc.ModuleHealth.Store(we.TwinID, we)
 	}else{
-	
-
+		watchEvent, isThisType := v.(*types.WatchEvent)
+		if isThisType {
+			for _, value :=  range we.List
+				ok := false 	
+				for _, val := range watchEvent.List {
+					if 	value == val {
+						ok = true
+						break
+					}					
+				}
+				if ok {
+					continue
+				}
+				append(watchEvent.List, value)
+			}
+		}
 	}
 }
-
