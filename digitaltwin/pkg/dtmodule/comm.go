@@ -140,35 +140,59 @@ func (cm *CommModule) dealMessageTimeout() {
 	cm.context.MessageCache.Range(func (key interface{}, value interface{}) bool {
 		msg, isMsgType := value.(*model.Message)
 		if isMsgType {
+			target := msg.GetTarget()
+			operation := msg.GetOperation()
+
 			timeStamp := msg.GetTimestamp()/1e3
 			now	:= time.Now().UnixNano() / 1e9
 			if now - timeStamp >= types.DGTWINS_MSG_TIMEOUT {
-				target := msg.GetTarget()
-				operation := msg.GetOperation()
 				if strings.Compare("device", target) == 0 {
 					if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
 						//mark device status is offline.
 						//send package and tell twin module, device is offline.
+						twinID := types.GetTwinID(msg)
 						dgtwin := &types.DigitalTwin{
-							ID: msg.GetID(),
+							ID: twinID,
 							State:	types.DGTWINS_STATE_OFFLINE,
 						}
+					
 						twins := []*types.DigitalTwin{dgtwin}
-						bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
-						if err != nil {
-							return false
+		
+						msgContent, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
+						if err == nil {
+							modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, types.DGTWINS_OPS_UPDATE, 
+																	types.DGTWINS_MODULE_TWINS, msgContent)
+							cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 						}
-						modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, 
-										types.DGTWINS_OPS_UPDATE, types.DGTWINS_RESOURCE_TWINS, bytes)
-						
-						cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 					}	
 				}
 				cm.context.MessageCache.Delete(key)
 				return true
 			}else{
-				//resend this message.
-				cm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
+				if strings.Compare("device", target) == 0 && 
+						strings.Compare(types.DGTWINS_OPS_SYNC, operation) == 0 {
+					// this is a ping message to device, then, we delete this mark
+					// and make this state as offline.
+					twinID := types.GetTwinID(msg)
+					dgtwin := &types.DigitalTwin{
+						ID: twinID,
+						State:	types.DGTWINS_STATE_OFFLINE,
+					}
+					
+					twins := []*types.DigitalTwin{dgtwin}
+		
+					msgContent, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
+					if err == nil {
+						modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, types.DGTWINS_OPS_UPDATE, 
+																	types.DGTWINS_MODULE_TWINS, msgContent)
+						cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
+					}
+
+					cm.context.MessageCache.Delete(key)
+				}else {
+					//resend this message.
+					cm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
+				}
 				return true
 			}
 		}

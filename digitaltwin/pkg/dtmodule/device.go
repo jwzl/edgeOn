@@ -2,6 +2,7 @@ package dtmodule
 
 import (
 	"sync"
+	"time"
 	"errors"
 	"strings"
 	"k8s.io/klog"
@@ -33,9 +34,10 @@ func NewDeviceModule() *DeviceModule {
 // Get whole device or device list.
 func (dm *DeviceModule) initDeviceCommandTable() {
 	dm.deviceCommandTbl = make(map[string]DeviceCommandFunc)
-	dm.deviceCommandTbl["Update"] = dm.deviceUpdateHandle
-	dm.deviceCommandTbl["Delete"] = dm.deviceDeleteHandle	
-	dm.deviceCommandTbl["Get"] = dm.deviceGetHandle	
+	dm.deviceCommandTbl[types.DGTWINS_OPS_UPDATE] = dm.deviceUpdateHandle
+	dm.deviceCommandTbl[types.DGTWINS_OPS_DELETE] = dm.deviceDeleteHandle	
+	dm.deviceCommandTbl[types.DGTWINS_OPS_GET] = dm.deviceGetHandle	
+	dm.deviceCommandTbl[types.DGTWINS_OPS_RESPONSE] = dm.deviceResponseHandle	
 }
 
 func (dm *DeviceModule) Name() string {
@@ -85,6 +87,9 @@ func (dm *DeviceModule) Start(){
 				klog.Infof("%s module stopped", dm.Name())
 				return
 			}
+		case <-time.After(120*time.Second):
+			//Check & sync device's state.
+			dm.PingDevice()	
 		}
 	}
 }
@@ -298,4 +303,77 @@ func (dm *DeviceModule) deviceGetHandle(msg *model.Message) (interface{}, error)
 	dm.context.SendResponseMessage(msg, msgContent)
 
 	return nil, nil
-}		
+}	
+
+// deviceResponseHandle: handle response.
+func (dm *DeviceModule) deviceResponseHandle(msg *model.Message) (interface{}, error) {
+	var resp types.DGTwinResponse
+
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		klog.Warningf("error message content format, ignore.")
+		return nil, errors.New("invaliad message content")
+	}
+
+	err := json.Unmarshal(content, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Code == types.OnlineCode {
+		if len(resp.Twins) > 0 {
+			for _, dgTwin := range resp.Twins {
+				if dgTwin == nil {
+					klog.Infof("Twin is nil, Ignored")
+					continue
+				}
+
+				twinID := dgTwin.ID
+				v, _ := dm.context.DGTwinList.Load(twinID)
+				savedTwin, isThisType:=v.(*types.DigitalTwin)
+				if isThisType && savedTwin != nil {
+					dm.context.Lock(twinID)
+					state := savedTwin.State
+					savedTwin.State = types.DGTWINS_STATE_ONLINE
+					savedTwin.LastState = state	
+					dm.context.Unlock(twinID)
+
+					if state != types.DGTWINS_STATE_ONLINE {
+						twins := []*types.DigitalTwin{savedTwin}
+		
+						msgContent, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
+						if err == nil {
+							modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", types.DGTWINS_OPS_UPDATE, 
+																	"device", msgContent)
+							dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+						}
+					}
+				}			
+			}
+		}  
+	}
+
+	dm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
+
+	return nil, nil
+}	
+
+//PingDevice: ping device. 
+func (dm *DeviceModule) PingDevice() {
+	dm.context.DGTwinList.Range(func(key, value interface{}) bool {
+		twinID := key.(string)
+		twin := &types.DigitalTwin{
+			ID: twinID,	
+		}	
+		twins := []*types.DigitalTwin{twin}
+		
+		msgContent, err := types.BuildTwinMessage(types.DGTWINS_OPS_SYNC, twins)
+		if err == nil {
+			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", types.DGTWINS_OPS_SYNC, 
+																	"device", msgContent)
+			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+		}
+
+		return true	
+	})	
+}

@@ -1,9 +1,7 @@
 package dtmodule
 
 import (
-	_"sync"
 	"errors"
-	_"strings"
 	"k8s.io/klog"
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
@@ -41,6 +39,7 @@ func (pm *PropertyModule) initPropertyCmdTbl() {
 	pm.propertyCmdTbl[types.DGTWINS_OPS_GET] = pm.propGetHandle
 	pm.propertyCmdTbl[types.DGTWINS_OPS_WATCH] = pm.propWatchHandle
 	pm.propertyCmdTbl[types.DGTWINS_OPS_SYNC] = pm.propSyncHandle
+	pm.propertyCmdTbl[types.DGTWINS_OPS_RESPONSE] = pm.propResponseHandle
 }
 
 func (pm *PropertyModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
@@ -294,12 +293,12 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 			if msgTwin.Properties == nil || len(msgTwin.Properties.Reported) < 1 {
 				reportedProps = savedReported
 				for propName, _ := range savedReported {
-					append(watchEvent.List, propName)
+					watchEvent.List = append(watchEvent.List, propName)
 				}
 			}else {				
 				for propName, _:= range newReported {
-					if value, exist := savedReported[key]; !exist {
-						reportedProps[key] = nil
+					if value, exist := savedReported[propName]; !exist {
+						reportedProps[propName] = nil
 						twinProperties:= &types.TwinProperties{
 							Reported: reportedProps,
 						}
@@ -318,8 +317,8 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 
 						return nil
 					}else {
-						append(watchEvent.List, propName)
-						reportedProps[key] = value
+						watchEvent.List = append(watchEvent.List, propName)
+						reportedProps[propName] = value
 					}
 				}		
 			}
@@ -349,11 +348,105 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 }
 
 func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
-	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
+	var dgTwinMsg types.DGTwinMessage 
 
-
+	if msg.GetSource() == "device" {
+		klog.Infof("we just process the SYNC data from device.")
 		return nil
-	})
+	}
+
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		return errors.New("invaliad message content")
+	}
+
+	err := json.Unmarshal(content, &dgTwinMsg)
+	if err != nil {
+		return err
+	}
+
+	//Currently, we just support a twin's property's list since
+	// we are just only foucus on the proprty's update.
+	for _, dgTwin := range dgTwinMsg.Twins	{
+		if dgTwin == nil {
+			klog.Infof("Twin is nil, Ignored")
+			continue
+		}
+		if dgTwin.Properties == nil {
+			klog.Infof("Twin Properties is nil, Ignored")
+			continue
+		}
+		twinID := dgTwin.ID
+		exist := pm.context.DGTwinIsExist(twinID)
+		if exist{
+			v, _ := pm.context.DGTwinList.Load(twinID)
+			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
+			if !isDgTwinType {
+				return errors.New("invalud digital twin type")
+			}
+ 			if savedTwin == nil {
+				return errors.New("savedTwin=nil, Unexpected error")
+			}	
+			if savedTwin.Properties == nil {
+				klog.Infof("Unexpected error, savedTwin.Properties == nil")
+				continue
+			}
+			//1. save the data.
+			pm.context.Lock(twinID)
+			savedReported := savedTwin.Properties.Reported	
+			newReported := dgTwin.Properties.Reported
+			for key, value := range newReported {
+				if _, ok := savedReported[key]; ok {
+					savedReported[key] = value
+				}
+			}
+			pm.context.Unlock(twinID)
+			//2. send response.
+			twins := []*types.DigitalTwin{dgTwin}
+			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "SYNC Success", twins)
+			if err != nil {
+				return err
+			}
+			pm.context.SendResponseMessage(msg, msgContent)
+			
+			//3. Check the cache event, if these property is cached, then send SYNC to target
+			pm.context.RangeWatchCache(func(key, value interface{}) bool {
+				ID := key.(string)
+				if twinID != ID	{
+					return true
+				}
+				
+				pm.context.Lock(twinID)
+				newReported := dgTwin.Properties.Reported
+				syncProps := make(map[string]*types.PropertyValue)
+				watchEvent := value.(*types.WatchEvent)
+				for _, prop := range watchEvent.List {
+					propValue, exist := newReported[prop]
+					if exist {
+						syncProps[prop] = propValue 
+					}	
+				}
+				pm.context.Unlock(twinID)
+
+				twinProperties:= &types.TwinProperties{
+					Reported: syncProps,
+				}
+				dgTwin.Properties = twinProperties
+				dgTwin.State = savedTwin.State
+
+				twins := []*types.DigitalTwin{dgTwin}
+				msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "SYNC", twins)
+				if err != nil {
+					return false
+				}
+				pm.context.SendSyncMessage(watchEvent, msgContent)
+				
+				return true
+			})
+		}
+	}
+
+	return nil
 }
 
 //handleMessage: General message process handle.
@@ -404,6 +497,31 @@ func (pm *PropertyModule) handleMessage (msg *model.Message, fn PropActionHandle
 			return fn(msg, savedTwin, dgTwin)
 		}
 	}
+
+	return nil
+}
+
+// propResponseHandle: handle all response.
+func (pm *PropertyModule) propResponseHandle (msg *model.Message ) error {
+	var resp types.DGTwinResponse
+
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		klog.Warningf("error message content format, ignore.")
+		return errors.New("invaliad message content")
+	}
+
+	err := json.Unmarshal(content, &resp)
+	if err != nil {
+		return err
+	}
+
+	if resp.Code != types.RequestSuccessCode {
+		//TODO:
+	}
+
+	//Success
+	pm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
 
 	return nil
 }

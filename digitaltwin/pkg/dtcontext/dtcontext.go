@@ -22,7 +22,7 @@ type DTContext struct {
 	ModuleHealth	*sync.Map
 	MessageCache	*sync.Map
 	//this is for watch event.
-	WatchCache	*sync.Map
+	WatchCache	[2]*sync.Map
 	// Cache for digitaltwin	
 	DGTwinList	*sync.Map
 	DGTwinMutex	*sync.Map	
@@ -169,6 +169,19 @@ func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []b
 	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 }
 
+//SendSyncMessage Send sync conten.
+func (dtc *DTContext) SendSyncMessage(we *types.WatchEvent, content []byte){
+	target := we.Source
+	resource := we.Resource
+
+	modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, target, 
+					types.DGTWINS_OPS_SYNC, resource, content)	
+	modelMsg.SetTag(we.MsgID)	
+	klog.Infof("Send sync message (%v)", modelMsg)
+
+	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+}
+
 //SendTwinMessage2Device Send twin message to device.
 func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action string, twins []*types.DigitalTwin) error {
 	resource := requestMsg.GetResource()
@@ -187,23 +200,34 @@ func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action s
 }
 
 func (dtc *DTContext) UpdateWatchCache(we *types.WatchEvent) {
+	var idx int 
 
 	if we == nil {
 		return 
 	}
 
-	if dtc.WatchCache == nil {
+	if dtc.WatchCache[0] == nil {
 		var watchCache	sync.Map
-		dtc.WatchCache = &watchCache
+		dtc.WatchCache[0] = &watchCache
+	}
+	if dtc.WatchCache[1] == nil {
+		var watchCache1	sync.Map
+		dtc.WatchCache[1] = &watchCache1
 	}
 
-	v, exist := dtc.WatchCache.Load(we.TwinID)
+	if strings.Contains(we.Source, "edge"){
+		idx = 1
+	}else {
+		idx = 0
+	}
+		
+	v, exist := dtc.WatchCache[idx].Load(we.TwinID)
 	if !exist {
-		dtc.ModuleHealth.Store(we.TwinID, we)
-	}else{
+		dtc.WatchCache[idx].Store(we.TwinID, we)
+	}else{ 
 		watchEvent, isThisType := v.(*types.WatchEvent)
 		if isThisType {
-			for _, value :=  range we.List
+			for _, value :=  range we.List {
 				ok := false 	
 				for _, val := range watchEvent.List {
 					if 	value == val {
@@ -214,8 +238,15 @@ func (dtc *DTContext) UpdateWatchCache(we *types.WatchEvent) {
 				if ok {
 					continue
 				}
-				append(watchEvent.List, value)
+				watchEvent.List = append(watchEvent.List, value)
 			}
 		}
+	}	
+}
+
+// RangeWatchCache  Range each watchevent.
+func (dtc *DTContext) RangeWatchCache(f func(key, value interface{}) bool){
+	for _, cacheMap := range dtc.WatchCache	{
+		cacheMap.Range(f)
 	}
 }

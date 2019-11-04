@@ -2,13 +2,17 @@ package types
 
 import (
 	"time"
+	"strings"
 	"encoding/json"
+	"github.com/jwzl/wssocket/model"
 )
 
 const (
 
 	//BadRequestCode sucess
 	RequestSuccessCode= 200 
+	//device is online.
+	OnlineCode= 600 
 	//BadRequestCode bad request
 	BadRequestCode = 400
 	//NotFoundCode device not found
@@ -82,4 +86,45 @@ func BuildTwinMessage(action string, twins []*DigitalTwin) ([]byte, error){
 	resultJSON, err := json.Marshal(twinMsg)
 
 	return resultJSON, err
+}
+
+// GetTwinID
+func GetTwinID(msg *model.Message) string {
+	var twins  []*DigitalTwin
+	operation := msg.GetOperation()
+	
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		return ""
+	}
+
+	if strings.Compare(DGTWINS_OPS_RESPONSE, operation) == 0 {
+		var resp DGTwinResponse
+
+		err := json.Unmarshal(content, &resp)
+		if err != nil {
+			return ""
+		}
+
+		twins = resp.Twins	
+	}else {
+		var dgTwinMsg DGTwinMessage
+
+		err := json.Unmarshal(content, &dgTwinMsg)
+		if err != nil {
+			return ""
+		}	
+		
+		twins = dgTwinMsg.Twins	
+	}
+
+	for _, dgTwin := range twins {
+		if dgTwin == nil {
+			continue
+		}
+
+		return dgTwin.ID
+	}	
+
+	return ""
 }
