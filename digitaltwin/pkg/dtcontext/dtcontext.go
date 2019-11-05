@@ -70,6 +70,13 @@ func (dtc *DTContext) SendToModule(dtmName string, content interface{}) error {
 	return errors.New("Channel not found")
 }
 
+//StopModule: stop this module 
+func (dtc *DTContext) StopModule(name string) {
+	if ch, exist := dtc.HeartBeatChan[name];  exist {
+		ch <- "stop"
+	}
+}
+
 //handle heartbeat.
 func (dtc *DTContext) HandleHeartBeat(dtmName string, content string) error {
 	if strings.Compare(content, "ping")	== 0 {

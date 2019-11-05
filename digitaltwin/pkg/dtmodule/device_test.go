@@ -248,3 +248,65 @@ func TestGetTwin(t *testing.T) {
 	heartBeat <- "stop"
 }
 
+
+func TestResponseHandle(t *testing.T) {
+	ctx := context.GetContext(context.MsgCtxTypeChannel)
+	dtcontext := dtcontext.NewDTContext(ctx)
+	dtcontext.CommChan["comm"] = make(chan interface{}, 128)
+	dtcontext.HeartBeatChan["comm"] = make(chan interface{}, 128)
+	deviceModule := NewDeviceModule()
+	comm := make(chan interface{}, 128)
+	heartBeat := make(chan interface{}, 128)
+
+	deviceModule.InitModule(dtcontext, comm, heartBeat, nil)
+	t.Log("Start test ResponseHandle")
+	
+	dgTwin := &types.DigitalTwin{
+		ID:	"dev001",
+		Name:	"sensor0",
+		Description: "None",
+		State: "offline",
+	}
+	// Store the twin
+	dtcontext.DGTwinList.Store("dev001", dgTwin)
+	var deviceMutex	sync.Mutex
+	dtcontext.DGTwinMutex.Store("dev001", &deviceMutex)
+
+	twins := []*types.DigitalTwin{dgTwin}
+	msgContent, err := types.BuildResponseMessage(types.OnlineCode, "SYNC", twins)
+	if err != nil {
+		return 
+	}
+	msg := dtcontext.BuildModelMessage("device", "edge/twin", types.DGTWINS_OPS_RESPONSE, "device", msgContent) 
+
+	comm <- msg
+	heartBeat <- "ping"
+
+	go deviceModule.Start()
+	time.Sleep(10 * time.Millisecond)
+
+	v, ok := <-dtcontext.CommChan["comm"]
+	if !ok {
+		t.Errorf("channel closed")
+	}
+	message, isMsgType := v.(*model.Message )
+	if !isMsgType {
+		t.Errorf("Not message type")
+	}
+
+	content, ok := message.Content.([]byte)
+	if !ok {
+		t.Errorf("invaliad message content")
+	}
+	var dgTwinMsg types.DGTwinMessage
+	json.Unmarshal(content, &dgTwinMsg)
+	for _, dgTwin := range dgTwinMsg.Twins	{
+		deviceID := dgTwin.ID
+		if deviceID != "dev001" {
+			t.Errorf("deviceID != dev001 ")
+		} 
+		if dgTwin.State != types.DGTWINS_STATE_ONLINE {
+			t.Errorf("deviceID should be online ")
+		}
+	}
+}
