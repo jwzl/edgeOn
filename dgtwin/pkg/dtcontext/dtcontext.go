@@ -8,11 +8,10 @@ import (
 	"k8s.io/klog"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
 )
 
 type DTContext struct {
-	DeviceID		string
 	Context			*context.Context
 	Modules			map[string]DTModule
 	CommChan		map[string]chan interface{}
@@ -29,6 +28,10 @@ type DTContext struct {
 }
 
 func NewDTContext(c *context.Context) *DTContext {
+	if c == nil {
+		return nil
+	}
+
 	modules	:= make(map[string]DTModule)
 	commChan := make(map[string]chan interface{})
 	heartBeatChan:= make(map[string]chan interface{})
@@ -58,6 +61,11 @@ func (dtc *DTContext) RegisterDTModule(dtm DTModule){
 	//Pass dtcontext to dtmodule.
 	dtm.InitModule(dtc, dtc.CommChan[moduleName], dtc.HeartBeatChan[moduleName], dtc.ConfirmChan)
 	dtc.Modules[moduleName] = dtm
+}
+
+//Receive recieve the message from other modules. 
+func (dtc *DTContext) Receive() (interface{}, error){
+	return dtc.Context.Receive(types.MODULE_NAME)
 }
 
 // send msg  to sub-module

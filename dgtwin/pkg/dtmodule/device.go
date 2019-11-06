@@ -8,13 +8,13 @@ import (
 	"k8s.io/klog"
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"
 )
 
 type DeviceCommandFunc  func(msg *model.Message )(interface{}, error)			
 //this module process the device Create/delete/update/query.
-type DeviceModule struct {
+type TwinModule struct {
 	// module name
 	name			string
 	context			*dtcontext.DTContext
@@ -26,13 +26,13 @@ type DeviceModule struct {
 	deviceCommandTbl 	map[string]DeviceCommandFunc
 }
 
-func NewDeviceModule() *DeviceModule {
-	return &DeviceModule{name: types.DGTWINS_MODULE_TWINS}
+func NewTwinModule() *TwinModule {
+	return &TwinModule{name: types.DGTWINS_MODULE_TWINS}
 }
 
 // Device command include: create/delete, update whole device, 
 // Get whole device or device list.
-func (dm *DeviceModule) initDeviceCommandTable() {
+func (dm *TwinModule) initDeviceCommandTable() {
 	dm.deviceCommandTbl = make(map[string]DeviceCommandFunc)
 	dm.deviceCommandTbl[types.DGTWINS_OPS_UPDATE] = dm.deviceUpdateHandle
 	dm.deviceCommandTbl[types.DGTWINS_OPS_DELETE] = dm.deviceDeleteHandle	
@@ -40,12 +40,12 @@ func (dm *DeviceModule) initDeviceCommandTable() {
 	dm.deviceCommandTbl[types.DGTWINS_OPS_RESPONSE] = dm.deviceResponseHandle	
 }
 
-func (dm *DeviceModule) Name() string {
+func (dm *TwinModule) Name() string {
 	return dm.name
 }
 
 //Init the device module.
-func (dm *DeviceModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
+func (dm *TwinModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
 	dm.context = dtc
 	dm.recieveChan = comm
 	dm.heartBeatChan = heartBeat
@@ -54,7 +54,7 @@ func (dm *DeviceModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, co
 }
 
 //Start Device module
-func (dm *DeviceModule) Start(){
+func (dm *TwinModule) Start(){
 	//Start loop.
 	for {
 		select {
@@ -95,7 +95,7 @@ func (dm *DeviceModule) Start(){
 }
 
 // handle device create and update.
-func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, error) {
+func (dm *TwinModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, error) {
 	var dgTwinMsg types.DGTwinMessage 
 
 	msgRespWhere := msg.GetSource()
@@ -182,7 +182,7 @@ func (dm *DeviceModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, e
 
 //deal twin update.
 //this is a patch for the old device state.
-func (dm *DeviceModule) dealTwinUpdate(oldTwin, newTwin *types.DigitalTwin) error {
+func (dm *TwinModule) dealTwinUpdate(oldTwin, newTwin *types.DigitalTwin) error {
 	if oldTwin == nil || newTwin == nil {
 		return errors.New("error oldTwin or newTwin")
 	}
@@ -208,7 +208,7 @@ func (dm *DeviceModule) dealTwinUpdate(oldTwin, newTwin *types.DigitalTwin) erro
 	return nil
 }
 
-func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, error) {
+func (dm *TwinModule)  deviceDeleteHandle(msg *model.Message) (interface{}, error) {
 	var dgTwinMsg types.DGTwinMessage 
 
 	content, ok := msg.Content.([]byte)
@@ -256,7 +256,7 @@ func (dm *DeviceModule)  deviceDeleteHandle(msg *model.Message) (interface{}, er
 	return nil, nil
 }
 
-func (dm *DeviceModule) deviceGetHandle(msg *model.Message) (interface{}, error) {
+func (dm *TwinModule) deviceGetHandle(msg *model.Message) (interface{}, error) {
 	var dgTwinMsg types.DGTwinMessage 
 	twins := make([]*types.DigitalTwin, 0)
 
@@ -306,7 +306,7 @@ func (dm *DeviceModule) deviceGetHandle(msg *model.Message) (interface{}, error)
 }	
 
 // deviceResponseHandle: handle response.
-func (dm *DeviceModule) deviceResponseHandle(msg *model.Message) (interface{}, error) {
+func (dm *TwinModule) deviceResponseHandle(msg *model.Message) (interface{}, error) {
 	var resp types.DGTwinResponse
 
 	content, ok := msg.Content.([]byte)
@@ -359,7 +359,7 @@ func (dm *DeviceModule) deviceResponseHandle(msg *model.Message) (interface{}, e
 }	
 
 //PingDevice: ping device. 
-func (dm *DeviceModule) PingDevice() {
+func (dm *TwinModule) PingDevice() {
 	dm.context.DGTwinList.Range(func(key, value interface{}) bool {
 		twinID := key.(string)
 		twin := &types.DigitalTwin{

@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"	
+	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"	
 )
 
-func TestNewDeviceModule(t *testing.T) {
-	deviceModule := NewDeviceModule()
+func TestNewTwinModule(t *testing.T) {
+	deviceModule := NewTwinModule()
 	if deviceModule == nil {
 		t.Fatal("Failed to create device module.")
 	}
@@ -22,7 +22,7 @@ func TestNewDeviceModule(t *testing.T) {
 func TestCreateTwin(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	deviceModule := NewDeviceModule()
+	deviceModule := NewTwinModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -61,7 +61,7 @@ func TestCreateTwin(t *testing.T) {
 func TestUpdateTwin(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	deviceModule := NewDeviceModule()
+	deviceModule := NewTwinModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -121,7 +121,7 @@ func TestUpdateTwin(t *testing.T) {
 func TestDeleteTwin(t *testing.T) {
 	ctx := context.GetContext(context.MsgCtxTypeChannel)
 	dtcontext := dtcontext.NewDTContext(ctx)
-	deviceModule := NewDeviceModule()
+	deviceModule := NewTwinModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -174,7 +174,7 @@ func TestGetTwin(t *testing.T) {
 	dtcontext := dtcontext.NewDTContext(ctx)
 	dtcontext.CommChan["comm"] = make(chan interface{}, 128)
 	dtcontext.HeartBeatChan["comm"] = make(chan interface{}, 128)
-	deviceModule := NewDeviceModule()
+	deviceModule := NewTwinModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 
@@ -254,7 +254,7 @@ func TestResponseHandle(t *testing.T) {
 	dtcontext := dtcontext.NewDTContext(ctx)
 	dtcontext.CommChan["comm"] = make(chan interface{}, 128)
 	dtcontext.HeartBeatChan["comm"] = make(chan interface{}, 128)
-	deviceModule := NewDeviceModule()
+	deviceModule := NewTwinModule()
 	comm := make(chan interface{}, 128)
 	heartBeat := make(chan interface{}, 128)
 

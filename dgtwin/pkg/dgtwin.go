@@ -1,8 +1,10 @@
-package digitaltwin
+package dgtwin
 
 import (
-	"github.com/kubeedge/beehive/pkg/core"
-	"github.com/kubeedge/beehive/pkg/core/context"
+	_"k8s.io/klog"
+	"github.com/jwzl/beehive/pkg/core"
+	"github.com/jwzl/beehive/pkg/core/context"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontroller"
 )
 
 const (
@@ -11,7 +13,7 @@ const (
 
 type DGTwinModule struct {
 	context 	*context.Context
-	controller	*DGTwinController
+	controller	*dtcontroller.DGTwinController
 }
 
 func Register(){	
@@ -32,10 +34,11 @@ func (dtm *DGTwinModule) Group() string {
 //Start this module.
 func (dtm *DGTwinModule) Start(c *context.Context) {
 	dtm.context = c
-	dtm.controller = controller.NewDGTwinController(c)
+	dtm.controller = dtcontroller.NewDGTwinController("", c)
 }
 
 //Cleanup
 func (dtm *DGTwinModule) Cleanup() {
+	dtm.controller.CleanUp()
 	dtm.context.Cleanup(dtm.Name())
 }

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"k8s.io/klog"
 	"github.com/jwzl/wssocket/model"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"
 )
 
 type CommandFunc  func(msg interface{}) error

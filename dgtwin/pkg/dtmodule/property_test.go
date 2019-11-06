@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/types"
-	"github.com/jwzl/edgeOn/digitaltwin/pkg/dtcontext"	
+	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
+	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"	
 )
 
 type PropertyTest struct {
