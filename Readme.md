@@ -6,8 +6,10 @@ edgeOn is an open source appliaction framework for edge computing. It's the impl
 ## Introduction
 
 
-### Client Architecture
-![Client Architecture](./docs/images/digitaltwin.png)
+### Architecture
+Client
+<img src="./docs/images/digitaltwin.png">
+
 
 ![Server Architecture](./docs/images/digitaltwin.png)
 
