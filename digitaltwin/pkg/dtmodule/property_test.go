@@ -86,7 +86,7 @@ func TestPropUpdateHandle(t *testing.T){
 	pt.StroeTwin(dgTwin)
 
 	//update.
-	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_UPDATE, &types.PropertyValue{Value: "1"})
+	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_UPDATE, &types.PropertyValue{Value: "1"}, false)
 	if err != nil {
 		t.Fatal("Update error ")
 	}
@@ -232,12 +232,17 @@ func GetTwins(v interface{})[]*types.DigitalTwin{
 	return twins
 }  
 
-func (pt *PropertyTest) propertyDoHandle(twinID, propName, action string, value *types.PropertyValue) error{
-	props := &types.TwinProperties{
-		Desired: map[string]*types.PropertyValue{
-			propName:	value,		
-		},
+func (pt *PropertyTest) propertyDoHandle(twinID, propName, action string, value *types.PropertyValue, report bool) error{
+	props := &types.TwinProperties{}
+
+	if report {
+		props.Reported = make(map[string]*types.PropertyValue)
+		props.Reported[propName] = value	
+	}else {
+		props.Desired = make(map[string]*types.PropertyValue)
+		props.Desired[propName] = value
 	}
+
 	twin := &types.DigitalTwin{
 		ID:	twinID,
 		Properties: props, 
@@ -281,7 +286,7 @@ func TestPropDeleteHandle(t *testing.T){
 	pt.StroeTwin(dgTwin)
 
 	//Delete.
-	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_DELETE, nil)
+	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_DELETE, nil, false)
 	if err != nil {
 		t.Fatal("Delete error ")
 	}
@@ -379,7 +384,7 @@ func TestPropGetHandle(t *testing.T){
 	pt.StroeTwin(dgTwin)
 
 	//Get.
-	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_GET, nil)
+	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_GET, nil, false)
 	if err != nil {
 		t.Fatal("Get error ")
 	}
@@ -422,7 +427,7 @@ func TestPropGetHandle(t *testing.T){
 	t.Log("Response okay. ")
 
 	//Check  the error response
-	err = pt.propertyDoHandle("dev001", "fuck", types.DGTWINS_OPS_GET, nil)
+	err = pt.propertyDoHandle("dev001", "fuck", types.DGTWINS_OPS_GET, nil, false)
 	if err != nil {
 		t.Fatal("Get error ")
 	}
@@ -441,6 +446,146 @@ func TestPropGetHandle(t *testing.T){
 		t.Fatal("property founded")
 	}
 	t.Log("Check okay. ")
+
+	pt.context.StopModule("property")	
+}
+
+func TestPropWatchAndSync(t *testing.T){
+	pt := NewPropertyTest()
+	pt.Start()	
+	t.Log("Start test TestPropWatchAndSync ")
+
+	props := &types.TwinProperties{
+		Reported: map[string]*types.PropertyValue{
+			"on/off":	&types.PropertyValue{Value: "0"},
+			"reboot":	&types.PropertyValue{Value: "1"},
+			"holdon":	&types.PropertyValue{Value: "2"},		
+		},
+	}
+	dgTwin := &types.DigitalTwin{
+		ID:	"dev001",
+		Name:	"sensor0",
+		Description: "None",
+		State: "offline",
+		Properties: props, 
+	}
+
+	// Store the twin
+	pt.StroeTwin(dgTwin)
+
+	// Watch "reboot" property.
+	err := pt.propertyDoHandle("dev001", "reboot", types.DGTWINS_OPS_WATCH, nil, true)
+	if err != nil {
+		t.Fatal("Get error ")
+	}
+	//check the reponse.
+	v, ok := <- pt.commChan
+	if !ok {
+		t.Fatal("Channel has closed..")
+	}
+	response := GetDTResponse(v)
+	if response == nil {
+		t.Fatal("Response error format.")
+	}
+
+	if response.Code !=types.RequestSuccessCode {
+		t.Fatal("Response err")
+	}
+	
+	twins := response.Twins
+	if twins == nil {
+		t.Fatal("twins is empty.")
+	}
+	
+	twin := twins[0]
+	if twin == nil {
+		t.Fatal("twin is empty.")
+	}
+
+	property := twin.Properties
+	if property == nil || len(property.Reported) != 1 {
+		t.Fatal("property is nil.")
+	}
+	if val, exist := property.Reported["reboot"]; !exist {
+		t.Fatal("property is not exist.")
+	}else {
+		if val.Value != "1" {
+			t.Fatal("Get error.")		
+		}
+	}
+	t.Log("Response okay. ")
+
+	// create a SYNC
+	t.Log("Create a sync request.")
+	props = &types.TwinProperties{
+		Reported: map[string]*types.PropertyValue{
+			"on/off":	&types.PropertyValue{Value: "7"},
+			"reboot":	&types.PropertyValue{Value: "sucess"},
+			"holdon":	&types.PropertyValue{Value: "9"},		
+		},
+	}
+	dgTwin = &types.DigitalTwin{
+		ID:	"dev001",
+		Properties: props, 
+	}
+	twins = []*types.DigitalTwin{dgTwin}
+	bytes, err := types.BuildTwinMessage(types.DGTWINS_OPS_SYNC, twins)
+	if err != nil {
+		t.Fatal("BuildTwinMessage error.")
+	}
+	modelMsg := pt.context.BuildModelMessage("device", types.MODULE_NAME, 
+							types.DGTWINS_OPS_SYNC, types.DGTWINS_MODULE_PROPERTY, bytes)
+
+	pt.context.SendToModule(types.DGTWINS_MODULE_PROPERTY, modelMsg) 
+
+	//check the reponse.
+	v, ok = <- pt.commChan
+	if !ok {
+		t.Fatal("Channel has closed..")
+	}
+	response = GetDTResponse(v)
+	if response == nil {
+		t.Fatal("Response error format.")
+	}
+	if response.Code !=types.RequestSuccessCode {
+		t.Fatal("Response err")
+	}
+	t.Log("Response success.")
+	
+	// check  sync
+	v, ok = <- pt.commChan
+	if !ok {
+		t.Fatal("Channel has closed..")
+	}
+	twins = GetTwins(v)
+	if twins == nil {
+		t.Fatal("No twins")
+	}
+
+	dgTwin = twins[0]
+	if dgTwin == nil {
+		t.Fatal("No twins")
+	}
+
+	if dgTwin.ID != "dev001" {
+		t.Fatal("error message")
+	}
+
+	if dgTwin.Properties == nil || dgTwin.Properties.Reported == nil ||
+			len(dgTwin.Properties.Reported) < 1 {
+		t.Fatal("no property SYNC")
+	}
+
+	reported := dgTwin.Properties.Reported
+	if val, exist :=reported["reboot"]; !exist {
+		t.Fatal("error SYNC, no this property")
+	}else {
+		if val.Value != "sucess" {
+			t.Fatal("error SYNC, SYNC failed")
+		}
+	}
+	t.Log("SYNC success. ")
+	
 
 	pt.context.StopModule("property")	
 }

@@ -304,7 +304,7 @@ func (pm *PropertyModule) propGetHandle (msg *model.Message ) error {
 func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
 		twinID := savedTwin.ID 
-		if savedTwin.Properties == nil || len(savedTwin.Properties.Reported) > 0 {
+		if savedTwin.Properties == nil || len(savedTwin.Properties.Reported) < 1 {
 			pm.sendNotFoundPropMessage(msg, msgTwin)
 		}else {
 			watchEvent := types.CreateWatchEvent(msg.GetID(), twinID, msg.GetSource(), msg.GetResource())
@@ -312,7 +312,6 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 			pm.context.Lock(twinID)
 
 			savedReported := savedTwin.Properties.Reported	
-			newReported := msgTwin.Properties.Reported
 			reportedProps := make(map[string]*types.PropertyValue)
 
 			if msgTwin.Properties == nil || len(msgTwin.Properties.Reported) < 1 {
@@ -320,7 +319,9 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 				for propName, _ := range savedReported {
 					watchEvent.List = append(watchEvent.List, propName)
 				}
-			}else {				
+			}else {	
+				newReported := msgTwin.Properties.Reported
+			
 				for propName, _:= range newReported {
 					if value, exist := savedReported[propName]; !exist {
 						reportedProps[propName] = nil
@@ -351,7 +352,6 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 			pm.context.Unlock(twinID)
 		
 			twins := []*types.DigitalTwin{msgTwin}
-			//TODO: maybe we shuold replace by SYNC.
 			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
 			if err != nil {
 				return err
@@ -366,10 +366,11 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 	})
 }
 
+//propSyncHandle sync reported property from device.
 func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
 	var dgTwinMsg types.DGTwinMessage 
 
-	if msg.GetSource() == "device" {
+	if msg.GetSource() != "device" {
 		klog.Infof("we just process the SYNC data from device.")
 		return nil
 	}
@@ -414,9 +415,17 @@ func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
 			pm.context.Lock(twinID)
 			savedReported := savedTwin.Properties.Reported	
 			newReported := dgTwin.Properties.Reported
-			for key, value := range newReported {
-				if _, ok := savedReported[key]; ok {
-					savedReported[key] = value
+			if newReported != nil && len(newReported) > 0 {
+				if savedReported == nil {
+					pm.context.Unlock(twinID)
+					pm.sendNotFoundPropMessage(msg, dgTwin)
+					return nil
+				}
+
+				for key, value := range newReported {
+					if _, ok := savedReported[key]; ok {
+						savedReported[key] = value
+					}
 				}
 			}
 			pm.context.Unlock(twinID)
@@ -535,6 +544,9 @@ func (pm *PropertyModule) propResponseHandle (msg *model.Message ) error {
 		return err
 	}
 
+	//TODO:
+	// use can closed the watch.	
+
 	if resp.Code != types.RequestSuccessCode {
 		//TODO:
 	}
@@ -545,7 +557,7 @@ func (pm *PropertyModule) propResponseHandle (msg *model.Message ) error {
 	return nil
 }
 
-func (pm *PropertyModule)  sendNotFoundPropMessage(msg *model.Message, msgTwin *types.DigitalTwin) error {
+func (pm *PropertyModule) sendNotFoundPropMessage(msg *model.Message, msgTwin *types.DigitalTwin) error {
 	twins := []*types.DigitalTwin{msgTwin}
 	msgContent, err := types.BuildResponseMessage(types.NotFoundCode, "twin No property/No this property", twins)
 	if err != nil {

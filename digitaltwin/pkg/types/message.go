@@ -13,6 +13,8 @@ const (
 	RequestSuccessCode= 200 
 	//device is online.
 	OnlineCode= 600 
+	//Close Watch code.
+	CloseWatchCode= 700 
 	//BadRequestCode bad request
 	BadRequestCode = 400
 	//NotFoundCode device not found
@@ -28,7 +30,6 @@ const (
 	DGTWINS_OPS_GET			= "Get"
 	DGTWINS_OPS_RESPONSE	= "Response"
 	DGTWINS_OPS_WATCH		= "Watch"
-	//device's verb	
 	DGTWINS_OPS_CREATE		= "Create"
 	DGTWINS_OPS_SYNC		= "Sync"
 
@@ -58,7 +59,7 @@ type DGTwinResponse struct{
 	Twins  []*DigitalTwin	`json:"twins,omitempty"`
 }
 
-
+// BuildResponseMessage
 func BuildResponseMessage(code int, reason string, twins  []*DigitalTwin) ([]byte, error){
 	now := time.Now().UnixNano() / 1e6
 
@@ -74,6 +75,7 @@ func BuildResponseMessage(code int, reason string, twins  []*DigitalTwin) ([]byt
 	return resultJSON, err
 }
 
+// BuildTwinMessage
 func BuildTwinMessage(action string, twins []*DigitalTwin) ([]byte, error){
 	now := time.Now().UnixNano() / 1e6
 
