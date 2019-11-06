@@ -9,10 +9,9 @@ edgeOn is an open source appliaction framework for edge computing. It's the impl
 ### Client Architecture
 ![Client Architecture](./docs/images/digitaltwin.png)
 
-### Server Architecture
 ![Server Architecture](./docs/images/digitaltwin.png)
 
 
-##Contributing
+## Contributing
 
 If you're interested in being a contributor and want to get involved in developing the edgeOn code, please see [CONTRIBUTING](CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
