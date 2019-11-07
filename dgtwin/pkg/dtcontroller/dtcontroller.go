@@ -1,7 +1,9 @@
 package dtcontroller
 
 import (
-	"time"	
+	"time"
+	"errors"
+	"strings"	
 	"k8s.io/klog"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
@@ -59,7 +61,7 @@ func (dtc *DGTwinController) Start() error {
 				if exist {
 					now := time.Now().Unix()
 					if now - v.(int64) > 80 {
-						klog.Infof("%s module is not healthy, we restart it")
+						klog.Infof("%s module is not healthy, we restart it", name)
 						go module.Start()
 					}
 				}
@@ -102,6 +104,23 @@ func (dtc *DGTwinController) RecvModuleMsg(){
 	}
 }
 
+// message dispatch.
 func (dtc *DGTwinController) dispatch(msg *model.Message) error {
+	if msg == nil {
+		return errors.New("message is nil")
+	}
+
+	target   := msg.GetTarget()
+	resource := msg.GetResource()
+	
+	if strings.Compare(types.MODULE_NAME, target) != 0 {
+		return errors.New("message is not to this module ")
+	}
+
+	if strings.Contains(resource, types.DGTWINS_MODULE_TWINS){
+		dtc.context.SendToModule(types.DGTWINS_MODULE_TWINS, msg)
+	}else if strings.Contains(resource, types.DGTWINS_MODULE_PROPERTY) {
+		dtc.context.SendToModule(types.DGTWINS_MODULE_PROPERTY, msg)
+	}
 	return nil
 }
