@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	ModuleNameHub= "edge/dgtwin"
+	ModuleNameHub= "edge/hub"
 )
 
 type MsgHub struct {
