@@ -1,0 +1,19 @@
+dgtwin:
+   id: "edge-001"
+
+msghub:
+   mqtt:
+     broker: tcp://127.0.0.1:1883  # mqtt broker url
+     qos: 2 # 0: QOSAtMostOnce, 1: QOSAtLeastOnce, 2: QOSExactlyOnce.
+     retain: false # if the flag set true, server will store the message and can be delivered to future subscribers.
+     session-queue-size: 100 # A size of how many sessions will be handled. default to 100.
+     user: qing		# mqtt broker user
+     passwd: 123    # mqtt broker passwd
+     keep-alive-interval: 120 #the amount of time (in seconds) that client should wait before sending a PING request to the broker.
+     ping-timeout: 120 # the amount of time (in seconds) that the client will wait after sending a PING request to the broker.
+   websocket:
+       url: wss://0.0.0.0:10000/e632aba927ea4ac2b575ec1603d56f10/edge-node/events
+       certfile: /etc/dgtwin/certs/edge.crt
+       keyfile: /etc/dgtwin/certs/edge.key  
+
+

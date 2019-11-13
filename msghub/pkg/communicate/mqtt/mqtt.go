@@ -8,6 +8,7 @@ import (
 	"github.com/jwzl/mqtt/client"
 	"github.com/jwzl/wssocket/fifo"
 	"github.com/jwzl/wssocket/model"
+	"github.com/jwzl/edgeOn/msghub/pkg/config"
 )
 
 const (
@@ -19,24 +20,13 @@ const (
 )
 
 type MqttClient	struct {
-	config	*MqttConfig
+	conf	*config.MqttConfig
 	client	*client.Client
 	// message fifo.
 	messageFifo  *fifo.MessageFifo
 }
 
-type MqttConfig struct {
-	URL				string
-	ClientID		string
-	User			string
-	Passwd			string
-	CertFilePath    string
-	KeyFilePath     string
-	keepAliveInterval	int
-	PingTimeout		int  
-}
-
-func NewMqttClient(conf *MqttConfig) *MqttClient {
+func NewMqttClient(conf *config.MqttConfig) *MqttClient {
 	if conf == nil {
 		return nil
 	}
@@ -46,12 +36,20 @@ func NewMqttClient(conf *MqttConfig) *MqttClient {
 		return nil
 	} 
 	
-	if conf.keepAliveInterval > 0 {
-		c.SetkeepAliveInterval(time.Duration(conf.keepAliveInterval) * time.Second)
+	if conf.KeepAliveInterval > 0 {
+		c.SetkeepAliveInterval(time.Duration(conf.KeepAliveInterval) * time.Second)
 	}
 	if conf.PingTimeout	 > 0 {
 		c.SetPingTimeout(time.Duration(conf.PingTimeout) * time.Second)
 	}
+	if conf.QOS >= 0 &&  conf.QOS <= 2 {
+		c.SetQOS(byte(conf.QOS))
+	}
+	c.SetRetain(conf.Retain)
+	if conf.MessageCacheDepth > 0 {
+		c.SetMessageCacheDepth(conf.MessageCacheDepth) 
+	}
+
 	tlsConfig, err := client.CreateTLSConfig(conf.CertFilePath, conf.KeyFilePath)
 	if err != nil {
 		klog.Infof("TLSConfig Disabled")
@@ -59,7 +57,7 @@ func NewMqttClient(conf *MqttConfig) *MqttClient {
 	c.SetTlsConfig(tlsConfig)
 
 	return &MqttClient{
-		config: conf,
+		conf: conf,
 		client: c,
 		messageFifo: fifo.NewMessageFifo(0),
 	}
@@ -74,7 +72,7 @@ func (c *MqttClient) Start() error {
 	//TODO: report its edgeID ?
 
 	//Subscribe this topic.
-	subTopic := fmt.Sprintf("%s/%s/#", MQTT_SUBTOPIC_PREFIX, c.config.ClientID)
+	subTopic := fmt.Sprintf("%s/%s/#", MQTT_SUBTOPIC_PREFIX, c.conf.ClientID)
 	err = c.client.Subscribe(subTopic, c.messageArrived)
 	if err != nil {
 		return err
@@ -112,6 +110,6 @@ func (c *MqttClient) ReadMessage() (*model.Message, error){
 
 //WriteMessage publish the message to cloud.
 func (c *MqttClient) WriteMessage(msg *model.Message) error {
-	pubTopic := fmt.Sprintf("%s/%s/comm", MQTT_PUBTOPIC_PREFIX, c.config.ClientID)
+	pubTopic := fmt.Sprintf("%s/%s/comm", MQTT_PUBTOPIC_PREFIX, c.conf.ClientID)
 	return c.client.Publish(pubTopic, msg)
 }
