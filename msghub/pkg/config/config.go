@@ -101,3 +101,68 @@ func GetMqttConfig() (*MqttConfig, error) {
 
 	return conf, nil
 }
+
+type WebsocketServerConfig struct{
+	URL				string
+	EdgeID			string
+	CertFilePath    string
+	KeyFilePath     string
+	HandshakeTimeout   int
+	ReadDeadline       int
+	WriteDeadline      int
+}
+
+func GetWSServerConfig() (*WebsocketServerConfig, error) {
+	conf := &WebsocketServerConfig{}
+
+	url, err := config.CONFIG.GetValue("msghub.websocket.url").ToString()
+	if err != nil {
+		klog.Errorf("Failed to get url for websocket server: %v", err)
+		return nil, err
+	}
+	conf.URL = url
+
+	id, err := config.CONFIG.GetValue("dgtwin.id").ToString()
+	if err != nil {
+		klog.Warningf("Failed to get edge id: %v", err)
+		return nil, err
+	}
+	conf.EdgeID = id
+
+	certfile, err := config.CONFIG.GetValue("msghub.websocket.certfile").ToString()
+	if err != nil {
+		klog.Infof("msghub.websocket.certfile is empty")
+		certfile = ""
+	}
+	conf.CertFilePath = certfile
+
+	keyfile, err := config.CONFIG.GetValue("msghub.websocket.keyfile").ToString()
+	if err != nil {
+		klog.Infof("msghub.websocket.keyfile is empty")
+		keyfile = ""
+	}
+	conf.KeyFilePath = keyfile
+
+	handshakeTimeout, err := config.CONFIG.GetValue("msghub.websocket.handshake-timeout").ToInt()
+	if err != nil {
+		klog.Infof("msghub.websocket.keyfile is empty")
+		handshakeTimeout = 30
+	}
+	conf.HandshakeTimeout = handshakeTimeout
+
+	readDeadline, err := config.CONFIG.GetValue("msghub.websocket.read-deadline").ToInt()
+	if err != nil {
+		klog.Infof("msghub.websocket.read-deadline is empty")
+		readDeadline = 15
+	}
+	conf.ReadDeadline = readDeadline
+
+	writeDeadline, err := config.CONFIG.GetValue("msghub.websocket.write-deadline").ToInt()
+	if err != nil {
+		klog.Infof("msghub.websocket.write-deadline is empty")
+		writeDeadline = 15
+	}
+	conf.WriteDeadline = writeDeadline
+
+	return conf, nil
+}
