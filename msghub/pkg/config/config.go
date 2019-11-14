@@ -105,6 +105,7 @@ func GetMqttConfig() (*MqttConfig, error) {
 type WebsocketServerConfig struct{
 	URL				string
 	EdgeID			string
+	CaFilePath		string
 	CertFilePath    string
 	KeyFilePath     string
 	HandshakeTimeout   int
@@ -129,23 +130,30 @@ func GetWSServerConfig() (*WebsocketServerConfig, error) {
 	}
 	conf.EdgeID = id
 
+	cafile, err := config.CONFIG.GetValue("msghub.websocket.cafile").ToString()
+	if err != nil {
+		klog.Errorf("msghub.websocket.cafile is empty, %v", err)
+		return nil, err
+	}
+	conf.CaFilePath = cafile
+
 	certfile, err := config.CONFIG.GetValue("msghub.websocket.certfile").ToString()
 	if err != nil {
-		klog.Infof("msghub.websocket.certfile is empty")
-		certfile = ""
+		klog.Errorf("msghub.websocket.certfile is empty")
+		return nil, err
 	}
 	conf.CertFilePath = certfile
 
 	keyfile, err := config.CONFIG.GetValue("msghub.websocket.keyfile").ToString()
 	if err != nil {
-		klog.Infof("msghub.websocket.keyfile is empty")
-		keyfile = ""
+		klog.Errorf("msghub.websocket.keyfile is empty")
+		return nil, err
 	}
 	conf.KeyFilePath = keyfile
 
 	handshakeTimeout, err := config.CONFIG.GetValue("msghub.websocket.handshake-timeout").ToInt()
 	if err != nil {
-		klog.Infof("msghub.websocket.keyfile is empty")
+		klog.Infof("msghub.websocket.handshake-timeout is empty")
 		handshakeTimeout = 30
 	}
 	conf.HandshakeTimeout = handshakeTimeout
