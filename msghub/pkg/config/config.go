@@ -111,6 +111,7 @@ type WebsocketServerConfig struct{
 	HandshakeTimeout   int
 	ReadDeadline       int
 	WriteDeadline      int
+	KeepaliveInterval  int
 }
 
 func GetWSServerConfig() (*WebsocketServerConfig, error) {
