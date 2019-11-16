@@ -40,20 +40,21 @@ func NewWSServer(in, out chan *model.Message, conf *config.WebsocketServerConfig
 		keepaliveChannel: make(map[string]chan struct{}), 
 		conf: 			conf,
 	}
-	tlsConfig, err := server.CreateTLSConfig(conf.CaFilePath, conf.CertFilePath, conf.KeyFilePath)
-	if err != nil {
-		klog.Errorf("Create tlsconfig err, %v", err)
-		return nil
-	}
 
 	wss := &server.Server{
 		Addr: conf.URL,
 		AutoRoute: true,
 		HandshakeTimeout: time.Duration(conf.HandshakeTimeout) * time.Second,
-		TLSConfig: tlsConfig,
 		ConnNotify: srv.OnConnect,
-		Handler:	srv.MessageHandle,	
+		Handler:	srv,	
 	}
+
+	tlsConfig, err := wss.CreateTLSConfig(conf.CaFilePath, conf.CertFilePath, conf.KeyFilePath)
+	if err != nil {
+		klog.Errorf("Create tlsconfig err, %v", err)
+		return nil
+	}
+	wss.TLSConfig = tlsConfig
 
 	srv.wsserver = wss 
 	
@@ -68,7 +69,7 @@ func (wss *WSServer)Start(){
 	wss.messageOutLoop()
 } 
 
-func (wss *WSServer) MessageHandle(headers http.Header, msg *model.Message, c *conn.Connection){
+func (wss *WSServer) MessageProcess(headers http.Header, msg *model.Message, c *conn.Connection){
 	appID := headers.Get("app_id")
 
 	if msg.GetOperation() == "keepalive" {
@@ -92,9 +93,9 @@ func (wss *WSServer) MessageHandle(headers http.Header, msg *model.Message, c *c
 	}	
 }
 
-func (wss *WSServer) OnConnect(connection conn.Connection){
+func (wss *WSServer) OnConnect(connection *conn.Connection){
 	//Record the connection.
-	appID := connection.ConnectionState().Headers.Get("app_id")
+	appID := connection.ConnectionState().Header.Get("app_id")
 	wss.conns.Store(appID, connection)
 
 	if _, ok := wss.keepaliveChannel[appID]; !ok {
@@ -104,8 +105,8 @@ func (wss *WSServer) OnConnect(connection conn.Connection){
 	go wss.serverConn(connection)
 } 
 
-func (wss *WSServer) serverConn(connection conn.Connection) {
-	appID := connection.ConnectionState().Headers.Get("app_id")
+func (wss *WSServer) serverConn(connection *conn.Connection) {
+	appID := connection.ConnectionState().Header.Get("app_id")
 	stop := make(chan int, 1)
 
 	go wss.keepaliveCheckLoop(appID, stop)
@@ -139,10 +140,15 @@ func (wss *WSServer) messageOutLoop() {
 		target = fmt.Sprintf("%s/%s",splitString[0], splitString[1])
 		msg.Router.Target = target
 
-		connection, exist := wss.conns.Load(appID)
+		v, exist := wss.conns.Load(appID)
 		if !exist {
 			klog.Warningf("No such connection for app(%s),  Ignored", appID)
         	continue
+		}
+		connection, isThisType := v.(*conn.Connection) 
+		if !isThisType {
+			klog.Warningf("is not connection type")
+			continue
 		}
 
 		connection.WriteMessage(msg)
@@ -155,20 +161,25 @@ func (wss *WSServer) keepaliveCheckLoop(appID string, stop chan int){
 
 		select {
 		case <-keepaliveTimer.C:
-			klog.Infof("timeout to recieve heartbeat from app %d", appID)
+			klog.Infof("timeout to recieve heartbeat from app %s", appID)
 			stop <- 1
 			return 
 		case <-wss.keepaliveChannel[appID]:
-			klog.Infof("connection is still alive from app%d", appID)
+			klog.Infof("connection is still alive from app%s", appID)
 			keepaliveTimer.Stop()
 		}
 	}
 } 
 //HubIOWrite: write message to connection.
 func (wss *WSServer) HubIOWrite(appID string, msg *model.Message) error {
-	connection, exist := wss.conns.Load(appID)
+	v, exist := wss.conns.Load(appID)
 	if !exist {
 		return errors.New("no this connection")
+	}
+
+	connection, isThisType := v.(*conn.Connection) 
+	if !isThisType {
+		return errors.New("is not connection")
 	}
 
 	return connection.WriteMessage(msg) 
