@@ -27,16 +27,16 @@ type WSServer struct {
 }
 
 // NewWSServer Create  websocket server.
-func NewWSServer(in, out chan *model.Message, conf *config.WebsocketServerConfig) *WSServer {
-	if conf == nil || in == nil || out == nil {
+func NewWSServer(conf *config.WebsocketServerConfig) *WSServer {
+	if conf == nil {
 		return nil
 	}
 
 	var connMap sync.Map
 	srv := &WSServer{
 		conns:			&connMap,
-		messageInChan:	in,
-		messageOutChan: out,
+		messageInChan:	make(chan *model.Message, 128),
+		messageOutChan: make(chan *model.Message, 128),
 		keepaliveChannel: make(map[string]chan struct{}), 
 		conf: 			conf,
 	}
@@ -68,6 +68,13 @@ func (wss *WSServer)Start(){
 	// loop for send message.
 	wss.messageOutLoop()
 } 
+
+func (wss *WSServer) Close(){
+	
+	wss.wsserver.Close()
+	close(wss.messageInChan)
+	close(wss.messageOutChan)
+}
 
 func (wss *WSServer) MessageProcess(headers http.Header, msg *model.Message, c *conn.Connection){
 	appID := headers.Get("app_id")
@@ -183,4 +190,12 @@ func (wss *WSServer) HubIOWrite(appID string, msg *model.Message) error {
 	}
 
 	return connection.WriteMessage(msg) 
+}
+
+func (wss *WSServer) GetMessageChan(inChan bool) chan *model.Message {
+	if inChan {
+		return wss.messageInChan
+	}
+
+	return wss.messageOutChan
 }

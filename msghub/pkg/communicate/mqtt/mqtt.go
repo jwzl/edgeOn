@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"fmt"
+	"sync"
 	"time"
 	"strings"
 	"k8s.io/klog"
@@ -20,6 +21,8 @@ const (
 )
 
 type MqttClient	struct {
+	// for mqtt send thread.
+	mutex sync.RWMutex
 	conf	*config.MqttConfig
 	client	*client.Client
 	// message fifo.
@@ -110,6 +113,9 @@ func (c *MqttClient) ReadMessage() (*model.Message, error){
 
 //WriteMessage publish the message to cloud.
 func (c *MqttClient) WriteMessage(msg *model.Message) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
 	pubTopic := fmt.Sprintf("%s/%s/comm", MQTT_PUBTOPIC_PREFIX, c.conf.ClientID)
 	return c.client.Publish(pubTopic, msg)
 }
