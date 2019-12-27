@@ -8,7 +8,7 @@ import (
 	"k8s.io/klog"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
+	"github.com/jwzl/edgeOn/dgtwin/types"
 )
 
 type DTContext struct {

@@ -11,7 +11,7 @@ import (
 	"github.com/jwzl/wssocket/server"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/wssocket/conn"
-	"github.com/jwzl/edgeOn/msghub/pkg/config"	
+	"github.com/jwzl/edgeOn/msghub/config"	
 )
 
 type WSServer struct {

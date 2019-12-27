@@ -5,8 +5,8 @@ import (
 	"k8s.io/klog"
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"
+	"github.com/jwzl/edgeOn/dgtwin/types"
+	"github.com/jwzl/edgeOn/dgtwin/dtcontext"
 )
 
 type PropertyCmdFunc  func(msg *model.Message ) error

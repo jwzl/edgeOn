@@ -5,10 +5,10 @@ import (
 	"k8s.io/klog"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/msghub/pkg/types"
-	"github.com/jwzl/edgeOn/msghub/pkg/config"
-	"github.com/jwzl/edgeOn/msghub/pkg/communicate/mqtt"
-	"github.com/jwzl/edgeOn/msghub/pkg/communicate/websocket"
+	"github.com/jwzl/edgeOn/msghub/types"
+	"github.com/jwzl/edgeOn/msghub/config"
+	"github.com/jwzl/edgeOn/msghub/communicate/mqtt"
+	"github.com/jwzl/edgeOn/msghub/communicate/websocket"
 )
 
 type Controller struct {

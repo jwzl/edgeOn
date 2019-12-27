@@ -13,6 +13,8 @@ require (
 	github.com/onsi/ginkgo v1.10.3 // indirect
 	github.com/onsi/gomega v1.7.1 // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
+	github.com/spf13/cobra v0.0.5
 	gopkg.in/yaml.v2 v2.2.5 // indirect
+	k8s.io/component-base v0.17.0 // indirect
 	k8s.io/klog v1.0.0
 )

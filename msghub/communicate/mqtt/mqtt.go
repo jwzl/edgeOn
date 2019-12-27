@@ -9,7 +9,7 @@ import (
 	"github.com/jwzl/mqtt/client"
 	"github.com/jwzl/wssocket/fifo"
 	"github.com/jwzl/wssocket/model"
-	"github.com/jwzl/edgeOn/msghub/pkg/config"
+	"github.com/jwzl/edgeOn/msghub/config"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"k8s.io/klog"
 	"github.com/jwzl/beehive/pkg/core"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontroller"
+	"github.com/jwzl/edgeOn/dgtwin/dtcontroller"
 )
 
 const (

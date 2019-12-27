@@ -2,8 +2,8 @@ package dtmodule
 
 import (
 	"k8s.io/klog"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"
+	"github.com/jwzl/edgeOn/dgtwin/types"
+	"github.com/jwzl/edgeOn/dgtwin/dtcontext"
 )
 
 func NewDTModule(moduleName string) dtcontext.DTModule {

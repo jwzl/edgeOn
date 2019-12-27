@@ -4,8 +4,8 @@ import (
 	"time"
 	"testing"
 	"github.com/jwzl/beehive/pkg/core/context"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/types"
-	"github.com/jwzl/edgeOn/dgtwin/pkg/dtcontext"
+	"github.com/jwzl/edgeOn/dgtwin/types"
+	"github.com/jwzl/edgeOn/dgtwin/dtcontext"
 )
 
 func TestNewCommModule(t *testing.T) {

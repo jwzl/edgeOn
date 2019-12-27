@@ -12,6 +12,7 @@ const (
 
 type MsgHub struct {
 	context		*context.Context
+	mhc		*Controller
 }
 
 // Register this module.
@@ -33,6 +34,10 @@ func (mh *MsgHub) Group() string {
 //Start this module.
 func (mh *MsgHub) Start(c *context.Context) {
 	klog.Infof("Start the module!")
+	mh.mhc = NewController(c)
+
+	// Start the message hub.
+	mh.mhc.Start()
 }
 
 //Cleanup
