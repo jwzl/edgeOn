@@ -67,9 +67,13 @@ func NewMqttClient(conf *config.MqttConfig) *MqttClient {
 }
 
 func (c *MqttClient) Start() error {
+
+restart_mqtt:
 	err := c.client.Start() 
 	if err != nil {
-		return err
+		klog.Warningf("Connect mqtt broker failed, retry....")
+		time.Sleep(3 * time.Second)
+		goto restart_mqtt
 	}
 
 	//TODO: report its edgeID ?
@@ -78,6 +82,7 @@ func (c *MqttClient) Start() error {
 	subTopic := fmt.Sprintf("%s/%s/#", MQTT_SUBTOPIC_PREFIX, c.conf.ClientID)
 	err = c.client.Subscribe(subTopic, c.messageArrived)
 	if err != nil {
+		klog.Fatalf("Subscribe topic(%s) err (%v)",subTopic, err)
 		return err
 	}
 

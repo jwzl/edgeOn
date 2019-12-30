@@ -44,11 +44,8 @@ func (hc * Controller)Start(){
 		hc.mqtt = client
 		
 		//Start the mqtt client.	
-		err = hc.mqtt.Start()
-		if err != nil {
-			klog.Fatalf("Start mqtt client err (%v)", err)
-			return
-		}
+		go hc.mqtt.Start()
+		
 	}
 
 	// Start websocket server.
