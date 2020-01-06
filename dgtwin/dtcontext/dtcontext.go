@@ -168,7 +168,7 @@ func (dtc *DTContext) BuildModelMessage(source string, target string, operation 
 
 //send message to module.
 func (dtc *DTContext) Send(module string, msg *model.Message) {
-	dtc.Context.Send(module, *msg)
+	dtc.Context.Send(module, msg)
 }
 
 //SendResponseMessage Send Response conten.

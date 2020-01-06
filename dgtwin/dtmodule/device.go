@@ -66,7 +66,8 @@ func (dm *TwinModule) Start(){
 			
 			message, isMsgType := msg.(*model.Message )
 			if isMsgType {
-				klog.Infof("device module recieved message (%v)", message)
+				klog.Infof("twin message arrived {Header:%v Router:%v-}", 
+												message.Header, message.Router)
 		 		// do handle.
 				if fn, exist := dm.deviceCommandTbl[message.GetOperation()]; exist {
 					_, err := fn(message)
@@ -120,39 +121,20 @@ func (dm *TwinModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, err
 			dm.context.DGTwinList.Store(deviceID, dgTwin)
 			var deviceMutex	sync.Mutex
 			dm.context.DGTwinMutex.Store(deviceID, &deviceMutex)
-			//save to sqlite, implement in future.
-			//Send Response to target.	
-			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", nil)
-			if err != nil {
-				//Internal err.
-				return nil,  err
-			}else{
-				//send the msg to comm module and process it
-				dm.context.SendResponseMessage(msg, msgContent)
-			}	
-			//notify device	
-			// send broadcast to all device, and wait (own this ID) device's response,
-			// if it has reply, then means that device is online.
-			deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
-						types.DGTWINS_OPS_CREATE, types.DGTWINS_RESOURCE_DEVICE, content)
-			klog.Infof("Send message (%v)", deviceMsg)
-			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)	
+			//save to sqlite, implement in future.	
 		}else {
 			//Update DGTwin
 			dm.context.Lock(deviceID)
-			v, exist := dm.context.DGTwinList.Load(deviceID)
-			if !exist {
-				return nil, errors.New("No such dgtwin in DGTwinList")
-			}
-			oldTwin, isDgTwinType  :=v.(*types.DigitalTwin)
-			if !isDgTwinType {
-				return nil,  errors.New("invalud digital twin type")
-			}
+			v, _ := dm.context.DGTwinList.Load(deviceID)
+			oldTwin, _ :=v.(*types.DigitalTwin)
 
 			//deal device update
-			dm.dealTwinUpdate(oldTwin, dgTwin)
+			err = dm.dealTwinUpdate(oldTwin, dgTwin)
 			dm.context.Unlock(deviceID)
 
+			if err != nil {
+				break
+			}
 			//if message's source is not edge/dgtwin, send response.
 			if strings.Compare(msgRespWhere, types.MODULE_NAME) != 0 {
 				msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", nil)
@@ -176,6 +158,23 @@ func (dm *TwinModule)  deviceUpdateHandle(msg *model.Message ) (interface{}, err
 			}
 		}
 	}
+
+	//Send Response to target.	
+	msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", nil)
+	if err != nil {
+		//Internal err.
+		return nil,  err
+	}else{
+		//send the msg to comm module and process it
+		dm.context.SendResponseMessage(msg, msgContent)
+	}	
+	//notify device	
+	// send broadcast to all device, and wait (own this ID) device's response,
+	// if it has reply, then means that device is online.
+	deviceMsg := dm.context.BuildModelMessage(types.MODULE_NAME, "device", 
+					types.DGTWINS_OPS_CREATE, types.DGTWINS_RESOURCE_DEVICE, content)
+	klog.Infof("Send to device with (%v)", deviceMsg)
+	dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
 	
 	return nil, nil
 }

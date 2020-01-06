@@ -80,6 +80,7 @@ restart_mqtt:
 
 	//Subscribe this topic.
 	subTopic := fmt.Sprintf("%s/%s/#", MQTT_SUBTOPIC_PREFIX, c.conf.ClientID)
+	klog.Infof("topic %s", subTopic)
 	err = c.client.Subscribe(subTopic, c.messageArrived)
 	if err != nil {
 		klog.Fatalf("Subscribe topic(%s) err (%v)",subTopic, err)
@@ -94,7 +95,7 @@ func (c *MqttClient) Close(){
 }
 
 func (c *MqttClient) messageArrived(topic string, msg *model.Message){
-	if msg != nil {
+	if msg == nil {
 		return
 	}
 
@@ -117,10 +118,13 @@ func (c *MqttClient) ReadMessage() (*model.Message, error){
 }
 
 //WriteMessage publish the message to cloud.
-func (c *MqttClient) WriteMessage(msg *model.Message) error {
+func (c *MqttClient) WriteMessage(clientID string, msg *model.Message) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	pubTopic := fmt.Sprintf("%s/%s/comm", MQTT_PUBTOPIC_PREFIX, c.conf.ClientID)
+	if clientID == "" {
+		clientID = c.conf.ClientID
+	}
+	pubTopic := fmt.Sprintf("%s/%s/comm", MQTT_PUBTOPIC_PREFIX, clientID)
 	return c.client.Publish(pubTopic, msg)
 }

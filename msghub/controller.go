@@ -96,10 +96,12 @@ func (hc * Controller) routeToUpstream(stop chan struct{}){
 		target := msg.GetTarget()
 		if strings.Contains(target, types.CloudName) {
 			// Send message over mqtt.
-			hc.mqtt.WriteMessage(msg) 
+			klog.Infof("Send message to cloud over mqtt..")
+			hc.mqtt.WriteMessage("", msg) 
 		}
 
 		if strings.Contains(target, types.EdgeAppName) {
+			klog.Infof("Send message to edge/app over websocket..")
 			msgChan := hc.wsServer.GetMessageChan(false)
 			msgChan <- msg
 		}
@@ -127,7 +129,7 @@ func (hc * Controller) routeFromWebsocket(stop chan struct{}){
 
 		if strings.Contains(target, types.CloudName) {
 			// Send message over mqtt.
-			hc.mqtt.WriteMessage(msg) 
+			hc.mqtt.WriteMessage("", msg) 
 		}
 
 		if strings.Contains(target, types.EdgeAppName) {
@@ -158,7 +160,7 @@ func (hc * Controller) routeFromMqtt(stop chan struct{}){
 
 		if strings.Contains(target, types.CloudName) {
 			// Send message over mqtt.
-			hc.mqtt.WriteMessage(msg) 
+			hc.mqtt.WriteMessage("", msg) 
 		}
 
 		if strings.Contains(target, types.EdgeAppName) {

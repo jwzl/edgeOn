@@ -120,7 +120,7 @@ func (cm *CommModule) sendMessageToHub(msg *model.Message) {
 	}
 
 	//send message to message hub.
-	cm.context.Send("hub", msg)
+	cm.context.Send(types.HubModuleName, msg)
 }
 
 //dealMessageResponse
