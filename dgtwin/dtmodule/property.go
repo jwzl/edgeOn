@@ -2,6 +2,7 @@ package dtmodule
 
 import (
 	"errors"
+	"strings"
 	"k8s.io/klog"
 	"encoding/json"
 	"github.com/jwzl/wssocket/model"
@@ -62,6 +63,8 @@ func (pm *PropertyModule) Start() {
 			
 			message, isMsgType := msg.(*model.Message)
 			if isMsgType {
+				klog.Infof("property message arrived {Header:%v Router:%v-}", 
+												message.Header, message.Router)
 				if fn, exist := pm.propertyCmdTbl[message.GetOperation()]; exist {
 					err := fn(message)
 					if err != nil {
@@ -119,19 +122,24 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 		pm.context.Unlock(twinID)
 
 		//Send the response
+		msgRespWhere := msg.GetSource()
 		twins := []*types.DigitalTwin{msgTwin}
-		msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
-		if err != nil {
-			return err
-		}else{
-			//send the msg to comm module and process it
-			pm.context.SendResponseMessage(msg, msgContent)
+
+		if strings.Compare(msgRespWhere, types.MODULE_NAME) != 0 {
+			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
+			if err != nil {
+				return err
+			}else{
+				//send the msg to comm module and process it
+				pm.context.SendResponseMessage(msg, msgContent)
+			}
 		}
 
 		// notify the device.
 		if msgTwin.Properties != nil {
 			pm.context.SendTwinMessage2Device(msg, types.DGTWINS_OPS_UPDATE, twins)
 		}
+
 		return nil
 	})
 }

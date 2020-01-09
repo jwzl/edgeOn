@@ -150,6 +150,19 @@ func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
 	return true
 }
 
+func (dtc *DTContext) TwinIsOnline(deviceID string) bool {
+	v, _ := dtc.DGTwinList.Load(deviceID)
+	dgTwin, _ := v.(*types.DigitalTwin)
+	
+	if dgTwin != nil {
+		if dgTwin.State == types.DGTWINS_STATE_ONLINE {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (dtc *DTContext) BuildModelMessage(source string, target string, operation string, resource string, content interface{}) *model.Message {
 	now := time.Now().UnixNano() / 1e6
 	
