@@ -6,6 +6,7 @@ import(
 	"github.com/jwzl/beehive/pkg/core"
 	"github.com/jwzl/edgeOn/msghub"
 	"github.com/jwzl/edgeOn/dgtwin"
+	"github.com/jwzl/edgeOn/switchbus"
 )
 
 /*
@@ -38,4 +39,5 @@ func NewAppCommand() *cobra.Command {
 func registerModules(){
 	dgtwin.Register()
 	msghub.Register()
+	switchbus.Register()
 }

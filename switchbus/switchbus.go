@@ -2,12 +2,12 @@ package  switchbus
 
 import (
 	"k8s.io/klog"
+	"github.com/jwzl/edgeOn/common"
 	"github.com/jwzl/beehive/pkg/core"
 	"github.com/jwzl/beehive/pkg/core/context"
 )
 
 const (
-	ModuleNameSwitchBus= "edge/bus"
 )
 
 type SwitchBus struct {
@@ -22,12 +22,12 @@ func Register(){
 
 //Name
 func (sb *SwitchBus) Name() string {
-	return ModuleNameSwitchBus
+	return common.BusModuleName
 }
 
 //Group
 func (sb *SwitchBus) Group() string {
-	return ModuleNameSwitchBus
+	return common.BusModuleName
 }
 
 //Start this module.
