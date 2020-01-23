@@ -3,15 +3,17 @@ package dtmodule
 import (
 	"errors"
 	"strings"
+	"strconv"
 	"k8s.io/klog"
 	"encoding/json"
+	"github.com/jwzl/edgeOn/common"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/edgeOn/dgtwin/types"
 	"github.com/jwzl/edgeOn/dgtwin/dtcontext"
 )
 
 type PropertyCmdFunc  func(msg *model.Message ) error
-type PropActionHandle func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error	
+type PropActionHandle func(msg *model.Message, savedTwin *common.DigitalTwin,  msgTwin *common.DeviceTwin) error	
 type PropertyModule struct {
 	// module name
 	name			string
@@ -35,12 +37,12 @@ func (pm *PropertyModule) Name() string {
 func (pm *PropertyModule) initPropertyCmdTbl() {
 	pm.propertyCmdTbl = make(map[string]PropertyCmdFunc)
 
-	pm.propertyCmdTbl[types.DGTWINS_OPS_UPDATE] = pm.propUpdateHandle
-	pm.propertyCmdTbl[types.DGTWINS_OPS_DELETE] = pm.propDeleteHandle
-	pm.propertyCmdTbl[types.DGTWINS_OPS_GET] = pm.propGetHandle
-	pm.propertyCmdTbl[types.DGTWINS_OPS_WATCH] = pm.propWatchHandle
-	pm.propertyCmdTbl[types.DGTWINS_OPS_SYNC] = pm.propSyncHandle
-	pm.propertyCmdTbl[types.DGTWINS_OPS_RESPONSE] = pm.propResponseHandle
+	pm.propertyCmdTbl[common.DGTWINS_OPS_UPDATE] = pm.propUpdateHandle
+	pm.propertyCmdTbl[common.DGTWINS_OPS_DELETE] = pm.propDeleteHandle
+	pm.propertyCmdTbl[common.DGTWINS_OPS_GET] = pm.propGetHandle
+	pm.propertyCmdTbl[common.DGTWINS_OPS_WATCH] = pm.propWatchHandle
+	pm.propertyCmdTbl[common.DGTWINS_OPS_SYNC] = pm.propSyncHandle
+	pm.propertyCmdTbl[common.DGTWINS_OPS_RESPONSE] = pm.propResponseHandle
 }
 
 func (pm *PropertyModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, confirm chan interface{}) {
@@ -88,45 +90,34 @@ func (pm *PropertyModule) Start() {
 	}
 }
 
-//propUpdateHandle: handle create/update property. 
+//propUpdateHandle: handle update property. 
 func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
-	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
+	return pm.handleMessage(msg, func(msg *model.Message, savedTwin *common.DigitalTwin,  msgTwin *common.DeviceTwin) error{
 		//savedTwin and msgTwin are always != nil
 		twinID := savedTwin.ID 
 		pm.context.Lock(twinID)
-		if savedTwin.Properties == nil {
-			savedTwin.Properties = &types.TwinProperties{}
-		}
+		
 		if savedTwin.Properties.Desired == nil {
-			savedTwin.Properties.Desired = make(map[string]*types.PropertyValue)
-		}
-		if savedTwin.Properties.Reported == nil {
-			savedTwin.Properties.Reported = make(map[string]*types.PropertyValue)
+			savedTwin.Properties.Desired = make(map[string]*common.TwinProperty)
 		}
 
-		if msgTwin.Properties != nil {
-			savedDesired  := savedTwin.Properties.Desired
-			savedReported := savedTwin.Properties.Reported		
-			newDesired := msgTwin.Properties.Desired
-			newReported := msgTwin.Properties.Reported
+		//if msgTwin.Properties != nil {
+		savedDesired  := savedTwin.Properties.Desired	
+		newDesired := msgTwin.Properties.Desired
 			
-			//Update twin property.
-			for key, value := range newDesired {
-				savedDesired[key] = value
-			}
-			//TODO: infuture we will delete it, since reported can be set. 
-			for key, value := range newReported {
-				savedReported[key] = value
-			}
-		}	
+		//Update twin property.
+		for _ , prop := range newDesired {
+			savedDesired[prop.Name] = &prop
+		}
+		//}	
 		pm.context.Unlock(twinID)
 
 		//Send the response
 		msgRespWhere := msg.GetSource()
-		twins := []*types.DigitalTwin{msgTwin}
+		twins := []common.DeviceTwin{*msgTwin}
 
 		if strings.Compare(msgRespWhere, types.MODULE_NAME) != 0 {
-			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
+			msgContent, err := common.BuildResponseMessage(common.RequestSuccessCode, "Success", twins)
 			if err != nil {
 				return err
 			}else{
@@ -136,9 +127,7 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 		}
 
 		// notify the device.
-		if msgTwin.Properties != nil {
-			pm.context.SendTwinMessage2Device(msg, types.DGTWINS_OPS_UPDATE, twins)
-		}
+		pm.context.SendTwinMessage2Device(msg, common.DGTWINS_OPS_UPDATE, twins)
 
 		return nil
 	})
@@ -147,66 +136,63 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 //propDeleteHandle: delete property
 func (pm *PropertyModule) propDeleteHandle(msg *model.Message ) error {
 	
-	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
+	return pm.handleMessage(msg, func(msg *model.Message, savedTwin *common.DigitalTwin, msgTwin *common.DeviceTwin) error{
 		twinID := savedTwin.ID 
 		pm.context.Lock(twinID)
-		if savedTwin.Properties == nil || msgTwin.Properties == nil {
-			pm.context.Unlock(twinID)
-			// send not found property message.
-			pm.sendNotFoundPropMessage(msg, msgTwin)
-		}else {
-			savedDesired  := savedTwin.Properties.Desired
-			savedReported := savedTwin.Properties.Reported		
-			newDesired := msgTwin.Properties.Desired
-			newReported := msgTwin.Properties.Reported
 		
-			if newDesired != nil && len(newDesired) > 0 {
-				if savedDesired == nil {
+		savedDesired  := savedTwin.Properties.Desired
+		savedReported := savedTwin.Properties.Reported		
+		newDesired := msgTwin.Properties.Desired
+		newReported := msgTwin.Properties.Reported
+		
+		if newDesired != nil && len(newDesired) > 0 {
+			if savedDesired == nil {
+				pm.context.Unlock(twinID)
+				pm.sendNotFoundPropMessage(msg, msgTwin)
+				return nil
+			}
+
+			for _ , prop := range newDesired {
+				if _, exist := savedDesired[prop.Name]; !exist {
 					pm.context.Unlock(twinID)
 					pm.sendNotFoundPropMessage(msg, msgTwin)
 					return nil
 				}
-				for key, _ := range newDesired {
-					if _, exist := savedDesired[key]; !exist {
-						pm.context.Unlock(twinID)
-						pm.sendNotFoundPropMessage(msg, msgTwin)
-						return nil
-					}
-					delete(savedDesired, key)
-				}
+				delete(savedDesired, prop.Name)
 			}
+		}
 		
-			if newReported != nil && len(newReported) > 0 {
-				if savedReported == nil {
+		if newReported != nil && len(newReported) > 0 {
+			if savedReported == nil {
+				pm.context.Unlock(twinID)
+				pm.sendNotFoundPropMessage(msg, msgTwin)
+				return nil
+			}
+
+			for _ , prop := range newReported {
+				if _, exist := savedReported[prop.Name]; !exist {
 					pm.context.Unlock(twinID)
 					pm.sendNotFoundPropMessage(msg, msgTwin)
 					return nil
 				}
-
-				for key, _ := range newReported {
-					if _, exist := savedReported[key]; !exist {
-						pm.context.Unlock(twinID)
-						pm.sendNotFoundPropMessage(msg, msgTwin)
-						return nil
-					}
-					delete(savedReported, key)
-				}
+				delete(savedReported, prop.Name)
 			}
-			pm.context.Unlock(twinID)
+		}
+		pm.context.Unlock(twinID)
 
-			twins := []*types.DigitalTwin{msgTwin}
-			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
-			if err != nil {
-				return err
-			}
+		twins := []common.DeviceTwin{*msgTwin}
+		msgContent, err := common.BuildResponseMessage(common.RequestSuccessCode, "Success", twins)
+		if err != nil {
+			return err
+		}
 			
-			//send the msg to comm module and process it
-			pm.context.SendResponseMessage(msg, msgContent)
-			//send delete to device.  
-			if (newReported != nil && len(newReported) > 0 ) || 
+		//send the msg to comm module and process it
+		pm.context.SendResponseMessage(msg, msgContent)
+		
+		//send delete to device.  
+		if (newReported != nil && len(newReported) > 0 ) || 
 					(newDesired != nil && len(newDesired) > 0 ) {
-				pm.context.SendTwinMessage2Device(msg, types.DGTWINS_OPS_DELETE, twins)
-			}
+			pm.context.SendTwinMessage2Device(msg, common.DGTWINS_OPS_DELETE, twins)
 		}
 		
 		return nil
@@ -215,90 +201,80 @@ func (pm *PropertyModule) propDeleteHandle(msg *model.Message ) error {
 
 //propGetHandle: Get property.
 func (pm *PropertyModule) propGetHandle (msg *model.Message ) error {
-	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
+	return pm.handleMessage(msg, func(msg *model.Message, savedTwin *common.DigitalTwin, msgTwin *common.DeviceTwin) error{
 		twinID := savedTwin.ID 
-		if savedTwin.Properties == nil || msgTwin.Properties == nil {
-
-			pm.sendNotFoundPropMessage(msg, msgTwin)
-		}else {
-			pm.context.Lock(twinID)
-			savedDesired  := savedTwin.Properties.Desired
-			savedReported := savedTwin.Properties.Reported		
-			newDesired := msgTwin.Properties.Desired
-			newReported := msgTwin.Properties.Reported
-
-			desiredProps := make(map[string]*types.PropertyValue)
-			if newDesired != nil && len(newDesired) > 0 {
-				if savedDesired == nil {
-					pm.context.Unlock(twinID)
-					pm.sendNotFoundPropMessage(msg, msgTwin)
-					return nil
-				}
-
-				for key, _ := range newDesired {
-					if value, exist := savedDesired[key]; !exist {
-						desiredProps[key] = nil
-						twinProperties:= &types.TwinProperties{
-							Desired: desiredProps,
-						}
-						msgTwin.Properties = twinProperties
-						msgTwin.State = savedTwin.State 
-					
-						pm.context.Unlock(twinID)
-
-						pm.sendNotFoundPropMessage(msg, msgTwin)
-						return nil
-					}else {
-						desiredProps[key] = value
-					}
-				}
-			}
 		
-			reportedProps := make(map[string]*types.PropertyValue)
-			if newReported != nil && len(newReported) > 0 {
-				if savedReported == nil {
+		pm.context.Lock(twinID)
+		savedDesired  := savedTwin.Properties.Desired
+		savedReported := savedTwin.Properties.Reported		
+		newDesired := msgTwin.Properties.Desired
+		newReported := msgTwin.Properties.Reported
+
+		desiredProps := make([]common.TwinProperty, 0)
+		if newDesired != nil && len(newDesired) > 0 {
+			if savedDesired == nil {
+				pm.context.Unlock(twinID)
+				pm.sendNotFoundPropMessage(msg, msgTwin)
+				return nil
+			}
+
+			for _, prop := range newDesired {
+				if value, exist := savedDesired[prop.Name]; !exist {
+					desiredProps = append(desiredProps, common.TwinProperty{Name: prop.Name})
+					msgTwin.Properties.Desired = desiredProps
+					msgTwin.Properties.Reported = nil
+					msgTwin.State = savedTwin.State 
+					
 					pm.context.Unlock(twinID)
+
 					pm.sendNotFoundPropMessage(msg, msgTwin)
 					return nil
-				}
-
-				for key, _ := range newReported {
-					if value, exist := savedReported[key]; !exist {
-						reportedProps[key] = nil
-						twinProperties:= &types.TwinProperties{
-							Reported: reportedProps,
-						}
-						msgTwin.Properties = twinProperties
-						msgTwin.State = savedTwin.State 
-					
-						pm.context.Unlock(twinID)
-	
-						//Not found this message.
-						pm.sendNotFoundPropMessage(msg, msgTwin)
-					
-						return nil
-					}else {
-						reportedProps[key] = value
-					}
+				}else {
+					desiredProps = append(desiredProps, *value)
 				}
 			}
-
-			twinProperties:= &types.TwinProperties{
-				Desired: desiredProps,
-				Reported: reportedProps,
-			}
-			msgTwin.Properties = twinProperties
-			msgTwin.State = savedTwin.State
-
-			pm.context.Unlock(twinID)
-
-			twins := []*types.DigitalTwin{msgTwin}
-			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "Success", twins)
-			if err != nil {
-				return err
-			}
-			pm.context.SendResponseMessage(msg, msgContent)			
 		}
+		
+		reportedProps := make([]common.TwinProperty, 0)
+		if newReported != nil && len(newReported) > 0 {
+			if savedReported == nil {
+				pm.context.Unlock(twinID)
+				pm.sendNotFoundPropMessage(msg, msgTwin)
+				return nil
+			}
+
+			for _, prop := range newReported {
+				if value, exist := savedReported[prop.Name]; !exist {
+					reportedProps = append(reportedProps, common.TwinProperty{Name: prop.Name})
+					msgTwin.Properties.Reported = reportedProps
+					msgTwin.Properties.Desired = nil
+					msgTwin.State = savedTwin.State 
+					
+					pm.context.Unlock(twinID)
+	
+					//Not found this message.
+					pm.sendNotFoundPropMessage(msg, msgTwin)
+					
+					return nil
+				}else {
+					reportedProps = append(reportedProps, *value)
+				}	
+			}
+		}
+
+			
+		msgTwin.Properties.Desired = desiredProps
+		msgTwin.Properties.Reported = reportedProps
+		msgTwin.State = savedTwin.State
+
+		pm.context.Unlock(twinID)
+
+		twins := []common.DeviceTwin{*msgTwin}
+		msgContent, err := common.BuildResponseMessage(common.RequestSuccessCode, "Success", twins)
+		if err != nil {
+			return err
+		}
+		pm.context.SendResponseMessage(msg, msgContent)			
 
 		return nil
 	})
@@ -310,8 +286,8 @@ func (pm *PropertyModule) propGetHandle (msg *model.Message ) error {
 // If Properties is nil or no  properties in request message, we consider it to watch all properties of 
 // this twin.
 func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
-	return pm.handleMessage(msg, func(msg *model.Message, savedTwin, msgTwin *types.DigitalTwin) error{
-		twinID := savedTwin.ID 
+	return pm.handleMessage(msg, func(msg *model.Message, savedTwin *common.DigitalTwin, msgTwin *common.DeviceTwin) error{
+		/*twinID := savedTwin.ID 
 		if savedTwin.Properties == nil || len(savedTwin.Properties.Reported) < 1 {
 			pm.sendNotFoundPropMessage(msg, msgTwin)
 		}else {
@@ -368,17 +344,18 @@ func (pm *PropertyModule) propWatchHandle (msg *model.Message ) error {
 
 			//Cache the watch event
 			pm.context.UpdateWatchCache(watchEvent)
-		}
+		}*/
 
 		return nil
 	})
 }
 
 //propSyncHandle sync reported property from device.
+// device will report the update of device's property automaticly.
 func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
-	var dgTwinMsg types.DGTwinMessage 
+	var twinMsg	common.DeviceMessage
 
-	if msg.GetSource() != "device" {
+	if msg.GetSource() != common.DeviceName {
 		klog.Infof("we just process the SYNC data from device.")
 		return nil
 	}
@@ -388,65 +365,56 @@ func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
 		return errors.New("invaliad message content")
 	}
 
-	err := json.Unmarshal(content, &dgTwinMsg)
+	err := json.Unmarshal(content, &twinMsg)
 	if err != nil {
 		return err
 	}
 
 	//Currently, we just support a twin's property's list since
 	// we are just only foucus on the proprty's update.
-	for _, dgTwin := range dgTwinMsg.Twins	{
-		if dgTwin == nil {
-			klog.Infof("Twin is nil, Ignored")
-			continue
+	dgTwin := &twinMsg.Twin	
+		
+	twinID := dgTwin.ID
+	
+	exist := pm.context.DGTwinIsExist(twinID)
+	if exist{
+		v, _ := pm.context.DGTwinList.Load(twinID)
+		savedTwin, isDgTwinType  :=v.(*common.DigitalTwin)
+		if !isDgTwinType {
+			return errors.New("invalud digital twin type")
 		}
-		if dgTwin.Properties == nil {
-			klog.Infof("Twin Properties is nil, Ignored")
-			continue
-		}
-		twinID := dgTwin.ID
-		exist := pm.context.DGTwinIsExist(twinID)
-		if exist{
-			v, _ := pm.context.DGTwinList.Load(twinID)
-			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
-			if !isDgTwinType {
-				return errors.New("invalud digital twin type")
+ 		if savedTwin == nil {
+			return errors.New("savedTwin=nil, Unexpected error")
+		}	
+		
+		//1. save the data.
+		pm.context.Lock(twinID)
+		savedReported := savedTwin.Properties.Reported	
+		newReported := dgTwin.Properties.Reported
+			
+		if newReported != nil && len(newReported) > 0 {
+			if savedReported == nil {
+				pm.context.Unlock(twinID)
+				//ignore.
+				return nil
 			}
- 			if savedTwin == nil {
-				return errors.New("savedTwin=nil, Unexpected error")
-			}	
-			if savedTwin.Properties == nil {
-				klog.Infof("Unexpected error, savedTwin.Properties == nil")
-				continue
-			}
-			//1. save the data.
-			pm.context.Lock(twinID)
-			savedReported := savedTwin.Properties.Reported	
-			newReported := dgTwin.Properties.Reported
-			if newReported != nil && len(newReported) > 0 {
-				if savedReported == nil {
-					pm.context.Unlock(twinID)
-					pm.sendNotFoundPropMessage(msg, dgTwin)
-					return nil
-				}
 
-				for key, value := range newReported {
-					if _, ok := savedReported[key]; ok {
-						savedReported[key] = value
-					}
+			for _ , prop := range newReported {
+				if _, ok := savedReported[prop.Name]; ok {
+					savedReported[prop.Name] = &prop
 				}
 			}
-			pm.context.Unlock(twinID)
-			//2. send response.
-			twins := []*types.DigitalTwin{dgTwin}
-			msgContent, err := types.BuildResponseMessage(types.RequestSuccessCode, "SYNC Success", twins)
-			if err != nil {
-				return err
-			}
-			pm.context.SendResponseMessage(msg, msgContent)
+		}
+		pm.context.Unlock(twinID)
+		//2. send response to device .
+		msgContent, err := common.BuildDeviceResponseMessage(strconv.Itoa(common.RequestSuccessCode), "SYNC Success", dgTwin)
+		if err != nil {
+			return err
+		}
+		pm.context.SendResponseMessage(msg, msgContent)
 			
 			//3. Check the cache event, if these property is cached, then send SYNC to target
-			pm.context.RangeWatchCache(func(key, value interface{}) bool {
+			/*pm.context.RangeWatchCache(func(key, value interface{}) bool {
 				ID := key.(string)
 				if twinID != ID	{
 					return true
@@ -478,8 +446,7 @@ func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
 				pm.context.SendSyncMessage(watchEvent, msgContent)
 				
 				return true
-			})
-		}
+			})*/
 	}
 
 	return nil
@@ -487,50 +454,46 @@ func (pm *PropertyModule) propSyncHandle (msg *model.Message ) error {
 
 //handleMessage: General message process handle.
 func (pm *PropertyModule) handleMessage (msg *model.Message, fn PropActionHandle) error {
-	var dgTwinMsg types.DGTwinMessage 
+	var twinMsg	common.TwinMessage
 
 	content, ok := msg.Content.([]byte)
 	if !ok {
 		return errors.New("invaliad message content")
 	}
 
-	err := json.Unmarshal(content, &dgTwinMsg)
+	err := json.Unmarshal(content, &twinMsg)
 	if err != nil {
 		return err
 	}
 
 	//Currently, we just support a twin's property's list since
 	// we are just only foucus on the proprty's update.
-	if len(dgTwinMsg.Twins) < 1 {
+	if len(twinMsg.Twins) < 1 {
 		klog.Warningf("invalid message format")
 		//TODO:
 	}
 
-	for _, dgTwin := range dgTwinMsg.Twins	{
-		if dgTwin == nil {
-			klog.Infof("Twin is nil, Ignored")
-			continue
-		}
+	for _, dgTwin := range twinMsg.Twins {
 		twinID := dgTwin.ID
 		exist := pm.context.DGTwinIsExist(twinID)
 		if !exist {
 			// Device has not created yet.
-			twins := []*types.DigitalTwin{dgTwin}
-			msgContent, err := types.BuildResponseMessage(types.NotFoundCode, "Twin Not found", twins)
+			twins := []common.DeviceTwin{dgTwin}
+			msgContent, err := common.BuildResponseMessage(common.NotFoundCode, "Twin Not found", twins)
 			if err != nil {
 				return err
 			}
 			pm.context.SendResponseMessage(msg, msgContent)
 		}else{
 			v, _ := pm.context.DGTwinList.Load(twinID)
-			savedTwin, isDgTwinType  :=v.(*types.DigitalTwin)
+			savedTwin, isDgTwinType  :=v.(*common.DigitalTwin)
 			if !isDgTwinType {
 				return errors.New("invalud digital twin type")
 			}
  			if savedTwin == nil {
 				return errors.New("savedTwin=nil, Unexpected error")
 			}	
-			return fn(msg, savedTwin, dgTwin)
+			return fn(msg, savedTwin, &dgTwin)
 		}
 	}
 
@@ -539,7 +502,7 @@ func (pm *PropertyModule) handleMessage (msg *model.Message, fn PropActionHandle
 
 // propResponseHandle: handle all response.
 func (pm *PropertyModule) propResponseHandle (msg *model.Message ) error {
-	var resp types.DGTwinResponse
+	/*var resp types.DGTwinResponse
 
 	content, ok := msg.Content.([]byte)
 	if !ok {
@@ -557,7 +520,7 @@ func (pm *PropertyModule) propResponseHandle (msg *model.Message ) error {
 
 	if resp.Code != types.RequestSuccessCode {
 		//TODO:
-	}
+	}*/
 
 	//Success
 	pm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
@@ -565,9 +528,9 @@ func (pm *PropertyModule) propResponseHandle (msg *model.Message ) error {
 	return nil
 }
 
-func (pm *PropertyModule) sendNotFoundPropMessage(msg *model.Message, msgTwin *types.DigitalTwin) error {
-	twins := []*types.DigitalTwin{msgTwin}
-	msgContent, err := types.BuildResponseMessage(types.NotFoundCode, "twin No property/No this property", twins)
+func (pm *PropertyModule) sendNotFoundPropMessage(msg *model.Message, msgTwin *common.DeviceTwin) error {
+	twins := []common.DeviceTwin{*msgTwin}
+	msgContent, err := common.BuildResponseMessage(common.NotFoundCode, "twin No property/No this property", twins)
 	if err != nil {
 		return err
 	}

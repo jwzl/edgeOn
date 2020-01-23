@@ -4,6 +4,7 @@ import (
 	"time"
 	"strings"
 	"k8s.io/klog"
+	"github.com/jwzl/edgeOn/common"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/edgeOn/dgtwin/types"
 	"github.com/jwzl/edgeOn/dgtwin/dtcontext"
@@ -55,18 +56,18 @@ func (cm *CommModule) Start(){
 			if isMsgType {
 		 		// do handle.
 				target := message.GetTarget()
-				if strings.Compare("device", target) == 0 {
+				if strings.Contains(target, common.DeviceName) {
 					//send to device.
 					klog.Infof("send to device")	
 					cm.sendMessageToDevice(message) 	
-				}else if strings.HasPrefix(target, "cloud") {
+				}else if strings.Contains(target, common.CloudName) {
 					//send to message cloud.
 					klog.Infof("send to cloud")
 					cm.sendMessageToHub(message)	
-				}else if strings.HasPrefix(target, "edge") {
-					if strings.Compare(types.MODULE_NAME, target) == 0 {
-						//this is response
-						cm.dealMessageResponse(message)
+				}else if strings.Contains(target, "edge") {
+					if strings.Contains(target, types.MODULE_NAME) {
+						//this is response or internal communication.
+						cm.dealMessageToTwin(message)
 					}else {
 						//this is edge/app
 						klog.Infof("send to edge/app")
@@ -97,7 +98,7 @@ func (cm *CommModule) Start(){
 func (cm *CommModule) sendMessageToDevice(msg *model.Message) {
 	operation := msg.GetOperation()
 
-	if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
+	if strings.Compare(common.DGTWINS_OPS_RESPONSE, operation) != 0 {
 		//cache this message for confirm recieve the response.
 		id := msg.GetID() 
 		_, exist := cm.context.MessageCache.Load(id)
@@ -107,7 +108,7 @@ func (cm *CommModule) sendMessageToDevice(msg *model.Message) {
 	}
 
 	//send message to protocol bus.
-	cm.context.Send("bus", msg)
+	cm.context.Send(common.BusModuleName, msg)
 }
 
 //sendMessageToHub
@@ -120,18 +121,23 @@ func (cm *CommModule) sendMessageToHub(msg *model.Message) {
 	}
 
 	//send message to message hub.
-	cm.context.Send(types.HubModuleName, msg)
+	cm.context.Send(common.HubModuleName, msg)
 }
 
-//dealMessageResponse
-func (cm *CommModule) dealMessageResponse(msg *model.Message) {
+//dealMessageToTwin
+func (cm *CommModule) dealMessageToTwin(msg *model.Message) {
 	//If we recieve the response message, then delete cache message.
 	//About the response success/failed, the corresponding resource module
 	// will do these things.	   
 	tag := msg.GetTag()
-	_ , exist := cm.context.MessageCache.Load(tag)
-	if exist {
-		cm.context.MessageCache.Delete(tag) 
+	if tag == "" {
+		// this is a message to twin.
+		cm.context.Send(common.TwinModuleName, msg)
+	} else {
+		_ , exist := cm.context.MessageCache.Load(tag)
+		if exist {
+			cm.context.MessageCache.Delete(tag) 
+		}
 	}	
 }
 
@@ -146,22 +152,20 @@ func (cm *CommModule) dealMessageTimeout() {
 			timeStamp := msg.GetTimestamp()/1e3
 			now	:= time.Now().UnixNano() / 1e9
 			if now - timeStamp >= types.DGTWINS_MSG_TIMEOUT {
-				if strings.Compare("device", target) == 0 {
-					if strings.Compare(types.DGTWINS_OPS_RESPONSE, operation) != 0 {
+				if strings.Compare(common.DeviceName, target) == 0 {
+					if strings.Compare(common.DGTWINS_OPS_RESPONSE, operation) != 0 {
 						//mark device status is offline.
 						//send package and tell twin module, device is offline.
-						twinID := types.GetTwinID(msg)
-						dgtwin := &types.DigitalTwin{
+						twinID := common.GetTwinID(msg)
+						dgtwin := &common.DeviceTwin{
 							ID: twinID,
-							State:	types.DGTWINS_STATE_OFFLINE,
+							State:	common.DGTWINS_STATE_OFFLINE,
 						}
-					
-						twins := []*types.DigitalTwin{dgtwin}
 		
-						msgContent, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
+						msgContent, err := common.BuildDeviceMessage(dgtwin)
 						if err == nil {
-							modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, types.DGTWINS_OPS_UPDATE, 
-																	types.DGTWINS_MODULE_TWINS, msgContent)
+							modelMsg := common.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, common.DGTWINS_OPS_UPDATE, 
+																	common.DGTWINS_RESOURCE_TWINS, msgContent)
 							cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 						}
 					}	
@@ -169,22 +173,20 @@ func (cm *CommModule) dealMessageTimeout() {
 				cm.context.MessageCache.Delete(key)
 				return true
 			}else{
-				if strings.Compare("device", target) == 0 && 
-						strings.Compare(types.DGTWINS_OPS_SYNC, operation) == 0 {
+				if strings.Compare(common.DeviceName, target) == 0 && 
+						strings.Compare(common.DGTWINS_OPS_SYNC, operation) == 0 {
 					// this is a ping message to device, then, we delete this mark
 					// and make this state as offline.
-					twinID := types.GetTwinID(msg)
-					dgtwin := &types.DigitalTwin{
+					twinID := common.GetTwinID(msg)
+					dgtwin := &common.DeviceTwin{
 						ID: twinID,
-						State:	types.DGTWINS_STATE_OFFLINE,
+						State:	common.DGTWINS_STATE_OFFLINE,
 					}
-					
-					twins := []*types.DigitalTwin{dgtwin}
 		
-					msgContent, err := types.BuildTwinMessage(types.DGTWINS_OPS_UPDATE, twins)
+					msgContent, err := common.BuildDeviceMessage(dgtwin)
 					if err == nil {
-						modelMsg := cm.context.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, types.DGTWINS_OPS_UPDATE, 
-																	types.DGTWINS_MODULE_TWINS, msgContent)
+						modelMsg := common.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, common.DGTWINS_OPS_UPDATE, 
+																	common.DGTWINS_RESOURCE_TWINS, msgContent)
 						cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 					}
 

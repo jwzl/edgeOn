@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"k8s.io/klog"
+	"github.com/jwzl/edgeOn/common"
 	"github.com/jwzl/wssocket/model"
 	"github.com/jwzl/beehive/pkg/core/context"
 	"github.com/jwzl/edgeOn/dgtwin/types"
@@ -142,7 +143,7 @@ func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
 		return false
 	}
 
-	_, isDGTwin := v.(*types.DigitalTwin)
+	_, isDGTwin := v.(*common.DigitalTwin)
 	if !isDGTwin {
 		return false
 	}
@@ -152,10 +153,10 @@ func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
 
 func (dtc *DTContext) TwinIsOnline(deviceID string) bool {
 	v, _ := dtc.DGTwinList.Load(deviceID)
-	dgTwin, _ := v.(*types.DigitalTwin)
+	dgTwin, _ := v.(*common.DigitalTwin)
 	
 	if dgTwin != nil {
-		if dgTwin.State == types.DGTWINS_STATE_ONLINE {
+		if dgTwin.State == common.DGTWINS_STATE_ONLINE {
 			return true
 		}
 	}
@@ -190,7 +191,7 @@ func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []b
 	resource := requestMsg.GetResource()
 
 	modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, target, 
-					types.DGTWINS_OPS_RESPONSE, resource, content)	
+					common.DGTWINS_OPS_RESPONSE, resource, content)	
 	modelMsg.SetTag(requestMsg.GetID())	
 	klog.Infof("Send response message (%v)", modelMsg)
 
@@ -203,7 +204,7 @@ func (dtc *DTContext) SendSyncMessage(we *types.WatchEvent, content []byte){
 	resource := we.Resource
 
 	modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, target, 
-					types.DGTWINS_OPS_SYNC, resource, content)	
+					common.DGTWINS_OPS_SYNC, resource, content)	
 	modelMsg.SetTag(we.MsgID)	
 	klog.Infof("Send sync message (%v)", modelMsg)
 
@@ -211,10 +212,10 @@ func (dtc *DTContext) SendSyncMessage(we *types.WatchEvent, content []byte){
 }
 
 //SendTwinMessage2Device Send twin message to device.
-func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action string, twins []*types.DigitalTwin) error {
+func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action string, twins []common.DeviceTwin) error {
 	resource := requestMsg.GetResource()
 
-	msgContent, err := types.BuildTwinMessage(action, twins)
+	msgContent, err := common.BuildTwinMessage(twins)
 	if err == nil {
 		modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, "device", 
 												action, resource, msgContent)
