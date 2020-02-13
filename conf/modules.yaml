@@ -1,2 +1,2 @@
 modules:
-    enabled: [edge/dgtwin, edge/hub]
+    enabled: [edge/dgtwin, edge/hub, edge/eventbus]

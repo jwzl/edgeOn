@@ -52,7 +52,7 @@ const (
 	CloudName		= "cloud"
 	EdgeAppName		= "edge/app"
 	TwinModuleName	= "edge/dgtwin"
-	BusModuleName	= "edge/switchbus"
+	BusModuleName	= "edge/eventbus"
 	DeviceName		= "device"
 )
 

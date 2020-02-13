@@ -1,41 +1,43 @@
-package  switchbus
+package  eventbus
 
 import (
 	"k8s.io/klog"
 	"github.com/jwzl/edgeOn/common"
 	"github.com/jwzl/beehive/pkg/core"
 	"github.com/jwzl/beehive/pkg/core/context"
+
+	mqttBus "github.com/jwzl/edgeOn/eventbus/mqtt"
 )
 
 const (
 )
 
-type SwitchBus struct {
+type EventBus struct {
 	context		*context.Context
 }
 
 // Register this module.
 func Register(){	
-	sb := &SwitchBus{}
+	sb := &EventBus{}
 	core.Register(sb)
 }
 
 //Name
-func (sb *SwitchBus) Name() string {
+func (eb *EventBus) Name() string {
 	return common.BusModuleName
 }
 
 //Group
-func (sb *SwitchBus) Group() string {
+func (eb *EventBus) Group() string {
 	return common.BusModuleName
 }
 
 //Start this module.
-func (sb *SwitchBus) Start(c *context.Context) {
+func (eb *EventBus) Start(c *context.Context) {
 	klog.Infof("Start the module!")
 }
 
 //Cleanup
-func (sb *SwitchBus) Cleanup() {
-	sb.context.Cleanup(sb.Name())
+func (eb *EventBus) Cleanup() {
+	eb.context.Cleanup(eb.Name())
 }
