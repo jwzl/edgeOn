@@ -148,7 +148,7 @@ func (dm *TwinModule) twinsCreateHandle(msg *model.Message) (interface{}, error)
 			// send broadcast to all device, and wait (own this ID) device's response,
 			// if it has reply, then will report all property of this device.
 			content, _ = common.BuildDeviceMessage(twin)
-			deviceMsg := common.BuildModelMessage(types.MODULE_NAME, "device/"+twinID, 
+			deviceMsg := common.BuildModelMessage(types.MODULE_NAME, "device-"+twinID, 
 					common.DGTWINS_OPS_DETECT, common.DGTWINS_RESOURCE_DEVICE, content)
 			klog.Infof("Send to device with (%v)", deviceMsg)
 			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)

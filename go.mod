@@ -3,7 +3,8 @@ module github.com/jwzl/edgeOn
 go 1.13
 
 require (
-	github.com/eclipse/paho.mqtt.golang v1.2.0 // indirect
+	github.com/256dpi/gomqtt v0.14.2
+	github.com/eclipse/paho.mqtt.golang v1.2.0
 	github.com/go-chassis/go-chassis v1.6.1 // indirect
 	github.com/go-chassis/paas-lager v1.1.0 // indirect
 	github.com/jwzl/beehive v0.0.0-20191028085830-1606e1f5c86a

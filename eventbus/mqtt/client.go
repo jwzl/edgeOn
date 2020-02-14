@@ -12,15 +12,15 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"crypto/tls"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	
 	"github.com/jwzl/edgeOn/common"
-	"github.com/jwzl/beehive/pkg/core/context"
+	"github.com/jwzl/wssocket/model"
+	"github.com/jwzl/beehive/pkg/core/context"	
 )
 
 var (
-	// MQTTHub client
-	MQTTHub *Client
 )
 
 // Client struct
@@ -28,6 +28,17 @@ type Client struct {
 	MQTTUrl string
 	PubCli  MQTT.Client
 	SubCli  MQTT.Client
+	// beehive context.
+	Context			*context.Context
+}
+
+
+func NewMqttClient(url string, c *context.Context) *Client {
+
+	return &Client{
+		MQTTUrl: url,
+		Context: c,	
+	}
 }
 
 // CheckClientToken checks token is right
@@ -54,19 +65,19 @@ func (mq *Client) LoopConnect(clientID string, client MQTT.Client) {
 }
 
 
-func onPubConnectionLost(client MQTT.Client, err error) {
+func (mq *Client) onPubConnectionLost(client MQTT.Client, err error) {
 	klog.Errorf("onPubConnectionLost with error: %v", err)
-	go MQTTHub.InitPubClient()
+	go mq.InitPubClient()
 }
 
-func onSubConnectionLost(client MQTT.Client, err error) {
+func (mq *Client) onSubConnectionLost(client MQTT.Client, err error) {
 	klog.Errorf("onSubConnectionLost with error: %v", err)
-	go MQTTHub.InitSubClient()
+	go mq.InitSubClient()
 }
 
-func onSubConnect(client MQTT.Client) {
+func (mq *Client) onSubConnect(client MQTT.Client) {
 	for _, t := range SubTopics {
-		token := client.Subscribe(t, 1, OnSubMessageReceived)
+		token := client.Subscribe(t, 1, mq.OnSubMessageReceived)
 		if rs, err := CheckClientToken(token); !rs {
 			klog.Errorf("edge-hub-cli subscribe topic: %s, %v", t, err)
 			return
@@ -76,10 +87,10 @@ func onSubConnect(client MQTT.Client) {
 }
 
 // OnSubMessageReceived msg received callback
-func OnSubMessageReceived(client MQTT.Client, message MQTT.Message) {
-	// for "$hw/events/device/#", send to twin
+func (mq *Client) OnSubMessageReceived(client MQTT.Client, message MQTT.Message) {
+	// for "$hw/events/twin/#", send to twin
 	
-	if strings.HasPrefix(message.Topic(), "$hw/events/device") {
+	if strings.HasPrefix(message.Topic(), "$hw/events/twin") {
 		now := time.Now().UnixNano() / 1e6
 	 
 		//Header
@@ -87,7 +98,7 @@ func OnSubMessageReceived(client MQTT.Client, message MQTT.Message) {
 		msg.BuildHeader("", now)
 
 		splitString := strings.Split(message.Topic(), "/")
-		//topic format is :$hw/events/device/deviceID/source/target/operation/resource/msgparentid
+		//topic format is :$hw/events/twin/deviceID/source/target/operation/resource/msgparentid
 		source := splitString[4]
 		target := splitString[5]
 		operation := splitString[6] 
@@ -100,10 +111,10 @@ func OnSubMessageReceived(client MQTT.Client, message MQTT.Message) {
 		}
 
 		//content
-		msg.Content = msg.Payload
+		msg.Content = message.Payload
 
 		klog.Info(fmt.Sprintf("Received msg from mqttserver, deliver to %s with resource %s", common.TwinModuleName, resource))
-		m.Context.Send(common.TwinModuleName, msg)
+		mq.Context.Send(common.TwinModuleName, msg)
 	}  
 }
 
@@ -131,9 +142,9 @@ func (mq *Client) InitSubClient() {
 
 	subID := fmt.Sprintf("hub-client-sub-%s", timeStr[0:right])
 	subOpts := mq.HubClientInit(mq.MQTTUrl, subID, "", "")
-	subOpts.OnConnect = onSubConnect
+	subOpts.OnConnect = mq.onSubConnect
 	subOpts.AutoReconnect = false
-	subOpts.OnConnectionLost = onSubConnectionLost
+	subOpts.OnConnectionLost = mq.onSubConnectionLost
 	mq.SubCli = MQTT.NewClient(subOpts)
 	mq.LoopConnect(subID, mq.SubCli)
 	klog.Info("finish hub-client sub")
@@ -150,7 +161,7 @@ func (mq *Client) InitPubClient() {
 
 	pubID := fmt.Sprintf("hub-client-pub-%s", timeStr[0:right])
 	pubOpts := mq.HubClientInit(mq.MQTTUrl, pubID, "", "")
-	pubOpts.OnConnectionLost = onPubConnectionLost
+	pubOpts.OnConnectionLost = mq.onPubConnectionLost
 	pubOpts.AutoReconnect = false
 	mq.PubCli = MQTT.NewClient(pubOpts)
 	mq.LoopConnect(pubID, mq.PubCli)

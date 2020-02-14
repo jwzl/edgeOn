@@ -7,6 +7,7 @@ package mqtt
 
 import (
 	"fmt"
+	"time"
 	"strings"
 	"k8s.io/klog"
 	
@@ -23,8 +24,8 @@ import (
 var (
 	// SubTopics which edge-client should be sub
 	SubTopics = []string{
-		"$hw/events/upload/#",
-		"$hw/events/device/#",
+		//"$hw/events/upload/#",
+		"$hw/events/twin/#",
 	}
 )
 //Server serve as an internal mqtt broker.
@@ -64,7 +65,7 @@ func NewMqttServer(sqz int, url string, retain bool, qos int, c *context.Context
 	return &Server{
 		sessionQueueSize: sqz,
 		url:              url,
-		tree:             topic.NewTree(),
+		tree:             topic.NewStandardTree(),
 		retain:           retain,
 		qos:              qos,
 		Context:		  c,
@@ -84,7 +85,6 @@ func (m *Server) Run() error {
 	m.backend = broker.NewMemoryBackend()
 	m.backend.SessionQueueSize = m.sessionQueueSize
 
-	/*
 	m.backend.Logger = func(event broker.LogEvent, client *broker.Client, pkt packet.Generic, msg *packet.Message, err error) {
 		if event == broker.MessagePublished {
 			if len(m.tree.Match(msg.Topic)) > 0 {
@@ -92,7 +92,6 @@ func (m *Server) Run() error {
 			}
 		}
 	}
-	*/
 
 	engine := broker.NewEngine(m.backend)
 	engine.Accept(m.server)
@@ -102,9 +101,9 @@ func (m *Server) Run() error {
 
 // onSubscribe will be called if the topic is matched in topic tree.
 func (m *Server) onSubscribe(message *packet.Message) {
-	// for "$hw/events/device/#", send to twin
+	// for "$hw/events/twin/#", send to twin
 	
-	if strings.HasPrefix(message.Topic, "$hw/events/device") {
+	if strings.HasPrefix(message.Topic, "$hw/events/twin") {
 		now := time.Now().UnixNano() / 1e6
 	 
 		//Header
@@ -112,7 +111,7 @@ func (m *Server) onSubscribe(message *packet.Message) {
 		msg.BuildHeader("", now)
 
 		splitString := strings.Split(message.Topic, "/")
-		//topic format is :$hw/events/device/deviceID/source/target/operation/resource/msgparentid
+		//topic format is :$hw/events/twin/deviceID/source/target/operation/resource/msgparentid
 		source := splitString[4]
 		target := splitString[5]
 		operation := splitString[6] 
@@ -125,7 +124,7 @@ func (m *Server) onSubscribe(message *packet.Message) {
 		}
 
 		//content
-		msg.Content = msg.Payload
+		msg.Content = message.Payload
 
 		klog.Info(fmt.Sprintf("Received msg from mqttserver, deliver to %s with resource %s", common.TwinModuleName, resource))
 		m.Context.Send(common.TwinModuleName, msg)
