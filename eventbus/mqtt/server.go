@@ -117,7 +117,7 @@ func (m *Server) onSubscribe(message *packet.Message) {
 		operation := splitString[6] 
 		resource := splitString[7] 
 		//Router
-		msg.BuildRouter(source, "", target, resource, operation)	
+		msg.BuildRouter(source, "", "edge/"+target, resource, operation)	
 
 		if len(splitString) == 9 {
 			msg.SetTag(splitString[8])	

@@ -127,7 +127,7 @@ func (pm *PropertyModule) propUpdateHandle(msg *model.Message ) error {
 		}
 
 		// notify the device.
-		pm.context.SendTwinMessage2Device(msg, common.DGTWINS_OPS_UPDATE, twins)
+		pm.context.SendMessage2Device(common.DGTWINS_OPS_UPDATE, msgTwin)
 
 		return nil
 	})
@@ -192,7 +192,7 @@ func (pm *PropertyModule) propDeleteHandle(msg *model.Message ) error {
 		//send delete to device.  
 		if (newReported != nil && len(newReported) > 0 ) || 
 					(newDesired != nil && len(newDesired) > 0 ) {
-			pm.context.SendTwinMessage2Device(msg, common.DGTWINS_OPS_DELETE, twins)
+			pm.context.SendMessage2Device(common.DGTWINS_OPS_DELETE, msgTwin)
 		}
 		
 		return nil

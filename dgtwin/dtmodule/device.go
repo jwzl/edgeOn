@@ -147,11 +147,7 @@ func (dm *TwinModule) twinsCreateHandle(msg *model.Message) (interface{}, error)
 			//detect the physical device	
 			// send broadcast to all device, and wait (own this ID) device's response,
 			// if it has reply, then will report all property of this device.
-			content, _ = common.BuildDeviceMessage(twin)
-			deviceMsg := common.BuildModelMessage(types.MODULE_NAME, "device-"+twinID, 
-					common.DGTWINS_OPS_DETECT, common.DGTWINS_RESOURCE_DEVICE, content)
-			klog.Infof("Send to device with (%v)", deviceMsg)
-			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
+			dm.context.SendMessage2Device(common.DGTWINS_OPS_DETECT, twin)
 		}
 	}
 	
@@ -206,17 +202,6 @@ func (dm *TwinModule) deviceUpdateHandle(msg *model.Message ) (interface{}, erro
 			klog.Infof("######### (%s) is online  ##########", twinID)
 			klog.Infof("######### Device information update successful  ##########")
 
-			//if the update is from device directly, then reply it.
-			if strings.Contains(msgSource, common.DGTWINS_RESOURCE_DEVICE) {
-		
-				content, _ = common.BuildDeviceResponseMessage(strconv.Itoa(common.RequestSuccessCode), 
-										"update success", &common.DeviceTwin{ID: twinID})
-				modelMsg := common.BuildModelMessage(types.MODULE_NAME, common.DeviceName, 
-					common.DGTWINS_OPS_RESPONSE, common.DGTWINS_RESOURCE_DEVICE, content)
-
-				klog.Infof("Device to device with (%v)", modelMsg)
-				dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
-			}
 			//notify others about device is online
 		} else {
 			//Internel err!
@@ -335,8 +320,7 @@ func (dm *TwinModule) deviceDeleteHandle(msg *model.Message) (interface{}, error
 		}
 
 		//notify the device delete link with dgtwin.
-		dm.context.SendTwinMessage2Device(msg, common.DGTWINS_OPS_DELETE, twinMsg.Twins)
-
+		dm.context.SendMessage2Device(common.DGTWINS_OPS_DELETE, dgTwin)
 		dm.context.SendResponseMessage(msg, msgContent)
 	}
 

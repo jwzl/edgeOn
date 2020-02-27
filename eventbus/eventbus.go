@@ -92,14 +92,25 @@ func (eb *EventBus) pubEdgeToDevice(c *context.Context){
 			break
 		}
 
+		klog.Infof("[EVENTBUS]  message arrived")
 		msg, isThisType := v.(*model.Message)
 		if !isThisType || msg == nil {
 			//invalid message type or msg == nil, Ignored. 		
 			continue
 		}
 		
+		s := msg.GetSource()
+		source := strings.Split(s, "/")
+		if len(source) != 2 || source[1] == "" {
+			continue
+		}
+		
+		if strings.Compare("edge", source[0]) != 0 {
+			continue
+		}
+
 		target := msg.GetTarget()
-		splitString := strings.Split(target, "-")
+		splitString := strings.Split(target, "@")
 		if len(splitString) != 2 || splitString[1] == "" {
 			continue
 		}
@@ -111,11 +122,13 @@ func (eb *EventBus) pubEdgeToDevice(c *context.Context){
 		* device topic format is :
 		* 	$hw/events/device/deviceID/source/target/operation/resource/msgparentid	
 		*/
-		topic := fmt.Sprintf("$hw/events/device/%s/%s/%s/%s/%s", splitString[1], msg.GetSource(),
+		topic := fmt.Sprintf("$hw/events/device/%s/%s/%s/%s/%s", splitString[1], source[1],
 										splitString[0], msg.GetOperation(), msg.GetResource())
 		tag := msg.GetTag()
         if tag != "" {
 			topic = fmt.Sprintf("%s/%s", topic, tag)
+		}else {
+			topic = fmt.Sprintf("%s/%s", topic, msg.GetID())
 		}
 
 		payload, ok :=msg.GetContent().([]byte)
@@ -123,6 +136,7 @@ func (eb *EventBus) pubEdgeToDevice(c *context.Context){
 			continue
 		}
 		
+		klog.Infof("topic: %s, payload = %s send to device", topic, payload)
 		//send to device.
 		eb.publish(topic, payload) 
 	}

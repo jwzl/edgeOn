@@ -523,6 +523,7 @@ loop:
 		return err
 	}
 	
+	time.Sleep(3 * time.Second)
 	goto loop
 
 	return nil

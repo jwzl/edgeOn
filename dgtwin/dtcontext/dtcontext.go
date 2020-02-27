@@ -211,21 +211,22 @@ func (dtc *DTContext) SendSyncMessage(we *types.WatchEvent, content []byte){
 	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 }
 
-//SendTwinMessage2Device Send twin message to device.
-func (dtc *DTContext) SendTwinMessage2Device(requestMsg *model.Message, action string, twins []common.DeviceTwin) error {
-	resource := requestMsg.GetResource()
+//SendMessage2Device Send twin message to device.
+func (dtc *DTContext) SendMessage2Device(action string, twin *common.DeviceTwin) error {
+	resource := common.DGTWINS_RESOURCE_DEVICE
+	deviceID := twin.ID
+	target := "device@"+deviceID 
 
-	msgContent, err := common.BuildTwinMessage(twins)
-	if err == nil {
-		modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, "device", 
-												action, resource, msgContent)
-		klog.Infof("Send device message (%v) ", modelMsg)
-		dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
-		
-		return nil
+	msgContent, err := common.BuildDeviceMessage(twin)
+	if err != nil {
+		return err
 	}
-	
-	return err
+	modelMsg := common.BuildModelMessage(types.MODULE_NAME, 
+							target, action, resource, msgContent) 
+	klog.Infof("Send device message (%v) ", modelMsg)
+	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+		
+	return nil
 }
 
 func (dtc *DTContext) UpdateWatchCache(we *types.WatchEvent) {
