@@ -23,11 +23,11 @@ Client
 	> $ go build mqtt_demo.go
 	> $ mv mqtt_demo  cloud_dummy_app
 
-### 2. build edgedev
+### 2. build edgedev (device sides)
 	> $ git clone https://github.com/jwzl/edgedev.git
 	> $ cd edgedev
 	> $ make
-### 3. run edgedev application.
+### 3. run edgedev application. 
 	> $ cd edgedev; ./edgedev
 ### 4. run edgeon
 	> $ cd edgeOn
@@ -35,7 +35,7 @@ Client
     > # configure the edgeOn/conf/edge.yaml 
 	> ./edgeOn
 
-### 5. run the test app dummy cloud app
+### 5. run the test app dummy cloud app	 (dummy cloud sides)
 	> $ cd 	edgeOn/tests
 	> $ ./cloud_dummy_app
 
