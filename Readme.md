@@ -13,6 +13,33 @@ Client
 
 ![Server Architecture](./docs/images/digitaltwin.png)
 
+## how to test this program.
+ These program will run in same a PC for test. 
+### 1. build edge on 
+	> $ git clone  https://github.com/jwzl/edgeOn.git
+	> $ cd 	edgeOn
+	> $ make
+	> $ cd  tests  
+	> $ go build mqtt_demo.go
+	> $ mv mqtt_demo  cloud_dummy_app
+
+### 2. build edgedev
+	> $ git clone https://github.com/jwzl/edgedev.git
+	> $ cd edgedev
+	> $ make
+### 3. run edgedev application.
+	> $ cd edgedev; ./edgedev
+### 4. run edgeon
+	> $ cd edgeOn
+	> ./tools/certgen.sh
+    > # configure the edgeOn/conf/edge.yaml 
+	> ./edgeOn
+
+### 5. run the test app dummy cloud app
+	> $ cd 	edgeOn/tests
+	> $ ./cloud_dummy_app
+
+	Then, you can see the device detailed information in cloud_dummy_app sides.
 
 ## Contributing
 
