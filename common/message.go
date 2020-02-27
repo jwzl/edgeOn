@@ -85,6 +85,27 @@ type DeviceResponse struct{
 	Twin  DeviceTwin			`json:"twin,omitempty"`
 }
 
+// GetDesiredProperties
+func GetDesiredProperties(twin *DeviceTwin) []TwinProperty {
+	return twin.Properties.Desired
+}
+
+// GetReportedProperties
+func GetReportedProperties(twin *DeviceTwin) []TwinProperty {
+	return twin.Properties.Reported
+}
+
+// GetPropertyValue
+func GetPropertyValue(props []TwinProperty, name string) *TwinProperty {
+	for key, _ := range props {
+		if name == props[key].Name {
+			return &props[key]
+		}
+	}
+
+	return nil
+}
+
 // BuildResponseMessage
 func BuildResponseMessage(code int, reason string, twins []DeviceTwin) ([]byte, error){
 	resp := &TwinResponse{

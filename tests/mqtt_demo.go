@@ -7,7 +7,6 @@ import (
 	"errors"
 	"strings"
 	"k8s.io/klog"
-	"encoding/json"
 	"github.com/jwzl/mqtt/client"
 	"github.com/jwzl/wssocket/fifo"
 	"github.com/jwzl/wssocket/model"
@@ -25,6 +24,7 @@ const (
 
 type Controller struct {
 	EdgeID		string
+	ModuleName  string
 	stopChan   chan struct{}
 	//mqtt client
 	mqtt	*client.Client
@@ -51,7 +51,7 @@ type Controller struct {
 	messageFifo  *fifo.MessageFifo
 }
 
-func NewController() *Controller {
+func NewController(module string) *Controller {
 	var messageCache sync.Map
 	var syncmessageCache sync.Map
 
@@ -91,6 +91,7 @@ func NewController() *Controller {
 	c.SetTlsConfig(tlsConfig)
 
 	return &Controller{
+		ModuleName:  module, 
 		mqtt:		c,
 		messageFifo: fifo.NewMessageFifo(0),
 		stopChan:   make(chan struct{}),
@@ -263,13 +264,7 @@ func (hc * Controller) doTwinMsgSend(from, to, operation, resource string,
 */
 func (hc * Controller) CreateTwins(iscloud bool, twinID string, 
 							timeout time.Duration) (*common.TwinResponse, error) {
-	var from string
- 
-	if iscloud {
-		from  = common.CloudName 
-	}else{ 
-		from  = common.EdgeAppName
-	}
+	from := hc.ModuleName
 
 	twins := []common.DeviceTwin{common.DeviceTwin{ID: twinID}}	
 	return hc.doTwinMsgSend(from, common.TwinModuleName, 
@@ -281,13 +276,7 @@ func (hc * Controller) CreateTwins(iscloud bool, twinID string,
 */
 func (hc * Controller) DeleteTwins(iscloud bool, twinID	string, 
 					timeout time.Duration) (*common.TwinResponse, error) {
-	var from string
- 
-	if iscloud {
-		from  = common.CloudName 
-	}else{ 
-		from  = common.EdgeAppName
-	}
+	from := hc.ModuleName
 	
 	twins := []common.DeviceTwin{common.DeviceTwin{ID: twinID}}
 	return hc.doTwinMsgSend(from, common.TwinModuleName, 
@@ -301,18 +290,12 @@ func (hc * Controller) GetDevice(iscloud bool, twinID []string,
 				timeout time.Duration) (*common.TwinResponse, error){
 
 	twins := make([]common.DeviceTwin, 0)
-	var from string
+	from := hc.ModuleName
 
 	for _, id := range twinID {
 		twins = append(twins,  common.DeviceTwin{
 			ID: id,	
 		})
-	}
- 
-	if iscloud {
-		from  = common.CloudName 
-	}else{ 
-		from  = common.EdgeAppName
 	}
 
 	return hc.doTwinMsgSend(from, common.TwinModuleName, 
@@ -322,17 +305,17 @@ func (hc * Controller) GetDevice(iscloud bool, twinID []string,
 /*
 * update twin's property.
 */
-func (hc * Controller) UpdateProperty(iscloud bool, twin *common.DeviceTwin, 
-							timeout time.Duration)(*common.TwinResponse, error){
+func (hc * Controller) UpdateProperty(deviceID string, properties  []common.TwinProperty,
+									 timeout time.Duration) (*common.TwinResponse, error){
 
-	var from string
- 	twins := []common.DeviceTwin{*twin}
-	
-	if iscloud {
-		from  = common.CloudName 
-	}else{ 
-		from  = common.EdgeAppName
-	}
+	from := hc.ModuleName
+	twin := common.DeviceTwin{
+		ID: deviceID,
+		Properties: common.DeviceTwinProperties{
+			Desired: properties,
+		},
+	}	
+ 	twins := []common.DeviceTwin{twin}
 
 	return hc.doTwinMsgSend(from, common.TwinModuleName, 
 				common.DGTWINS_OPS_UPDATE, common.DGTWINS_RESOURCE_PROPERTY, twins, timeout)	
@@ -489,13 +472,36 @@ loop:
 		return err
 	}
 	
-	
 	klog.Infof("######## Get the result")
-	for _, dgtwin := range rsp.Twins {
-		dJSON, _ := json.Marshal(dgtwin)
-		klog.Infof("#####(%s) #######3", dJSON)
+	dev := &rsp.Twins[0]
+	klog.Infof("##### Device  Information: ", dev)	
+	desiredProps := common.GetDesiredProperties(dev)
+	//reportedProps := common.GetReportedProperties(dev)
+
+	prop := common.GetPropertyValue(desiredProps, "led_pin0")
+	prop.Value[0] = 0x50
+	prop.Value[1] = 0xA5	
+
+	//update the property
+	properties:= []common.TwinProperty{*prop}
+	rsp, err = hc.UpdateProperty("00-0B-AB-C0-C2-C4", properties, 2*time.Second)
+	if err != nil {
+		klog.Warningf("UpdateProperty failed with err (%v)", err)
+		return err
+	}
+	if rsp.Code != common.RequestSuccessCode {
+		klog.Warningf("create device failed with err (%d, %s)", rsp.Code, rsp.Reason)
+		return err
 	}
 
+	// Get the property;
+
+	// Watch the propeerty.
+
+	// delete the porperty  
+
+
+	time.Sleep(3 * time.Second)
 	rsp, err = hc.DeleteTwins(true, "00-0B-AB-C0-C2-C4", 2*time.Second)
 	if err != nil {
 		klog.Warningf("Delete device failed with err (%v)", err)
@@ -505,16 +511,6 @@ loop:
 		klog.Warningf("delete device failed with err (%d, %s)", rsp.Code, rsp.Reason)
 		return err
 	}
-
-	//update the property
-
-	// Get the property;
-
-	// Watch the propeerty.
-
-	// delete the porperty  
-
-
 	klog.Infof("delete device Successful (%v)", rsp)
 	
 	rsp, err = hc.GetDevice(true, twinIDs, 2*time.Second)
@@ -532,7 +528,7 @@ loop:
 * main
 */
 func main() {
-	controller := NewController()
+	controller := NewController(common.CloudName)
 
 	//Start the cloud test over mqtt.
 	controller.Start() 
