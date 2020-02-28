@@ -44,6 +44,7 @@ func (cm *CommModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, conf
 //TODO: Device should has a healthcheck.
 func (cm *CommModule) Start(){
 	//Start loop.
+	checkTimeoutCh := time.After(10*time.Second)
 	for {
 		select {
 		case msg, ok := <-cm.recieveChan:
@@ -87,9 +88,10 @@ func (cm *CommModule) Start(){
 				klog.Infof("%s module stopped", cm.Name())
 				return
 			}
-		case <-time.After(60*time.Second):
+		case <-checkTimeoutCh:
 			//check  the MessageCache for response.
 			cm.dealMessageTimeout()	
+			checkTimeoutCh = time.After(10*time.Second)
 		}
 	}
 }
@@ -113,13 +115,16 @@ func (cm *CommModule) sendMessageToDevice(msg *model.Message) {
 
 //sendMessageToHub
 func (cm *CommModule) sendMessageToHub(msg *model.Message) {
-	//cache this message for confirm recieve the response.
-	id := msg.GetID() 
-	_, exist := cm.context.MessageCache.Load(id)
-	if !exist {
-		cm.context.MessageCache.Store(id, msg)
-	}
+	operation := msg.GetOperation()
 
+	if strings.Compare(common.DGTWINS_OPS_RESPONSE, operation) != 0 {
+		//cache this message for confirm recieve the response.
+		id := msg.GetID() 
+		_, exist := cm.context.MessageCache.Load(id)
+		if !exist {
+			cm.context.MessageCache.Store(id, msg)
+		}
+	}
 	//send message to message hub.
 	cm.context.Send(common.HubModuleName, msg)
 }
@@ -152,7 +157,7 @@ func (cm *CommModule) dealMessageTimeout() {
 			timeStamp := msg.GetTimestamp()/1e3
 			now	:= time.Now().UnixNano() / 1e9
 			if now - timeStamp >= types.DGTWINS_MSG_TIMEOUT {
-				if strings.Compare(common.DeviceName, target) == 0 {
+				if strings.Contains(target, common.DeviceName) {
 					if strings.Compare(common.DGTWINS_OPS_RESPONSE, operation) != 0 {
 						//mark device status is offline.
 						//send package and tell twin module, device is offline.
@@ -173,26 +178,32 @@ func (cm *CommModule) dealMessageTimeout() {
 				cm.context.MessageCache.Delete(key)
 				return true
 			}else{
-				if strings.Compare(common.DeviceName, target) == 0 && 
-						strings.Compare(common.DGTWINS_OPS_SYNC, operation) == 0 {
+				if strings.Contains(target, common.DeviceName) && 
+						strings.Compare(common.DGTWINS_OPS_DETECT, operation) == 0 {
 					// this is a ping message to device, then, we delete this mark
 					// and make this state as offline.
 					twinID := common.GetTwinID(msg)
-					dgtwin := &common.DeviceTwin{
-						ID: twinID,
-						State:	common.DGTWINS_STATE_OFFLINE,
-					}
-		
-					msgContent, err := common.BuildDeviceMessage(dgtwin)
-					if err == nil {
-						modelMsg := common.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, common.DGTWINS_OPS_UPDATE, 
-																	common.DGTWINS_RESOURCE_TWINS, msgContent)
-						cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
-					}
+					twinState := cm.context.GetTwinState(twinID)
+					if twinState != common.DGTWINS_STATE_CREATED &&
+					   		twinState != common.DGTWINS_STATE_OFFLINE {
 
+						dgtwin := &common.DeviceTwin{
+							ID: twinID,
+							State:	common.DGTWINS_STATE_OFFLINE,
+						}
+		
+						msgContent, err := common.BuildDeviceMessage(dgtwin)
+						if err == nil {
+							modelMsg := common.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, common.DGTWINS_OPS_UPDATE, 
+																	common.DGTWINS_RESOURCE_TWINS, msgContent)
+							cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
+						}
+					}
 					cm.context.MessageCache.Delete(key)
+					klog.Infof("### Detect Device(%s) is offline", twinID)
 				}else {
 					//resend this message.
+					klog.Infof("### Resend this message...")
 					cm.context.SendToModule(types.DGTWINS_MODULE_COMM, msg)
 				}
 				return true

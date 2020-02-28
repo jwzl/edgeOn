@@ -38,12 +38,15 @@ const (
 	DGTWINS_OPS_WATCH		= "Watch"
 	DGTWINS_OPS_SYNC		= "Sync"
 	DGTWINS_OPS_DETECT		= "Detect"
+	DGTWINS_OPS_KEEPALIVE		= "Keepalive"
 
 	//State
-	DGTWINS_STATE_ONLINE	="online"	
-	DGTWINS_STATE_OFFLINE	="offline"
+	DGTWINS_STATE_CREATED	= "created"	
+	DGTWINS_STATE_ONLINE	= "online"	
+	DGTWINS_STATE_OFFLINE	= "offline"
 
 	// Resource
+	DGTWINS_RESOURCE_EDGE	="edge"	
 	DGTWINS_RESOURCE_TWINS	="twins"
 	DGTWINS_RESOURCE_PROPERTY	="property"
 	DGTWINS_RESOURCE_DEVICE	="device"
@@ -58,14 +61,14 @@ const (
 
 //Create/update/Delete/Get twins message format
 type TwinMessage struct{	
-	Twins  []DeviceTwin 	`json:"twins"`
+	Twins  []DigitalTwin 	`json:"twins"`
 }
 
 // Response message format
 type TwinResponse struct{
 	Code   int    			`json:"code"`
 	Reason string 			`json:"reason,omitempty"`
-	Twins  []DeviceTwin		`json:"twins,omitempty"`
+	Twins  []DigitalTwin		`json:"twins,omitempty"`
 }
 
 /*
@@ -107,7 +110,7 @@ func GetPropertyValue(props []TwinProperty, name string) *TwinProperty {
 }
 
 // BuildResponseMessage
-func BuildResponseMessage(code int, reason string, twins []DeviceTwin) ([]byte, error){
+func BuildResponseMessage(code int, reason string, twins []DigitalTwin) ([]byte, error){
 	resp := &TwinResponse{
 		Code: code,
 		Reason: reason,
@@ -135,8 +138,25 @@ func UnMarshalResponseMessage(msg *model.Message)(*TwinResponse, error){
 	return &rspMsg, nil
 }
 
+//UnMarshalTwinMessage.
+func UnMarshalTwinMessage(msg *model.Message)(*TwinMessage, error){
+	var twinMsg TwinMessage
+
+	content, ok := msg.Content.([]byte)
+	if !ok {
+		return nil, errors.New("invaliad message content")
+	}
+
+	err := json.Unmarshal(content, &twinMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &twinMsg, nil
+}
+
 // BuildTwinMessage
-func BuildTwinMessage(twins []DeviceTwin) ([]byte, error){
+func BuildTwinMessage(twins []DigitalTwin) ([]byte, error){
 	twinMsg := &TwinMessage{
 		Twins: twins,
 	}
@@ -165,7 +185,7 @@ func BuildModelMessage(source string, target string, operation string, resource 
 
 // GetTwinID
 func GetTwinID(msg *model.Message) string {
-	var twins  []DeviceTwin
+	var twins  []DigitalTwin
 	operation := msg.GetOperation()
 	
 	content, ok := msg.Content.([]byte)
@@ -254,4 +274,10 @@ func UnMarshalDeviceResponseMessage(msg *model.Message)(*DeviceResponse, error){
 	}
 
 	return &respMsg, nil
+}
+
+type EdgeInfo struct{
+	EdgeID		string	`json:"edgeid"`
+	EdgeName	string	`json:"edgeid,omitempty"`
+	Description	string	`json:"edgeid,omitempty"`
 }

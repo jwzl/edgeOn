@@ -58,6 +58,7 @@ func (dm *TwinModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, conf
 
 //Start Device module
 func (dm *TwinModule) Start(){
+	KeepaliveCh := time.After(120 *time.Second)
 	//Start loop.
 	for {
 		select {
@@ -91,9 +92,11 @@ func (dm *TwinModule) Start(){
 				klog.Infof("%s module stopped", dm.Name())
 				return
 			}
-		case <-time.After(120*time.Second):
+		case <-KeepaliveCh:
 			//Check & sync device's state.
+			klog.Infof("#######  ping device  #############")
 			dm.PingDevice()	
+			KeepaliveCh = time.After(120 *time.Second)
 		}
 	}
 }
@@ -120,7 +123,6 @@ func (dm *TwinModule) twinsCreateHandle(msg *model.Message) (interface{}, error)
 		return nil, err
 	}
 	
-	twins := make([]common.DeviceTwin, 0)
 	//get all requested twins
 	for key, _ := range twinMsg.Twins	{
 		twin := &twinMsg.Twins[key]
@@ -130,7 +132,7 @@ func (dm *TwinModule) twinsCreateHandle(msg *model.Message) (interface{}, error)
 		if !exist {
 			dgTwin := &common.DigitalTwin{
 				ID:	twinID,
-				State: common.DGTWINS_STATE_OFFLINE,
+				State: common.DGTWINS_STATE_CREATED,
 			}
 			
 			//Create DGTwin is always success since it just create data startuctre
@@ -140,19 +142,21 @@ func (dm *TwinModule) twinsCreateHandle(msg *model.Message) (interface{}, error)
 			var deviceMutex	sync.Mutex
 			dm.context.DGTwinMutex.Store(twinID, &deviceMutex)
 			//save to sqlite, implement in future.
-			//TODO:
-
-			twins = append(twins, common.DeviceTwin{ID: twinID})	
+			//TODO:	
 
 			//detect the physical device	
 			// send broadcast to all device, and wait (own this ID) device's response,
 			// if it has reply, then will report all property of this device.
-			dm.context.SendMessage2Device(common.DGTWINS_OPS_DETECT, twin)
+			deviceTwin := &common.DeviceTwin{
+				ID: twinID,
+				State:	common.DGTWINS_STATE_CREATED,
+			}
+			dm.context.SendMessage2Device(common.DGTWINS_OPS_DETECT, deviceTwin)
 		}
 	}
 	
 	//Send response.
-	msgContent, err := common.BuildResponseMessage(common.RequestSuccessCode, "Success", twins)
+	msgContent, err := common.BuildResponseMessage(common.RequestSuccessCode, "Success", twinMsg.Twins)
 	if err != nil {
 		//Internal err			
 		return nil,  err
@@ -199,10 +203,17 @@ func (dm *TwinModule) deviceUpdateHandle(msg *model.Message ) (interface{}, erro
 		dm.context.Unlock(twinID)
 
 		if err == nil {
-			klog.Infof("######### (%s) is online  ##########", twinID)
+			klog.Infof("######### (%s) is %s  ##########", twinID, oldTwin.State)
 			klog.Infof("######### Device information update successful  ##########")
 
 			//notify others about device is online
+			twins := []common.DigitalTwin{*oldTwin}
+	 		msgContent, err := common.BuildTwinMessage(twins)
+			if err != nil {
+				return nil, err
+			}
+			//Send the Sync message.
+			dm.context.SendSyncMessage(common.CloudName, common.DGTWINS_RESOURCE_TWINS, msgContent)
 		} else {
 			//Internel err!
 		}
@@ -320,7 +331,8 @@ func (dm *TwinModule) deviceDeleteHandle(msg *model.Message) (interface{}, error
 		}
 
 		//notify the device delete link with dgtwin.
-		dm.context.SendMessage2Device(common.DGTWINS_OPS_DELETE, dgTwin)
+		devTwin := &common.DeviceTwin{ID: twinID}
+		dm.context.SendMessage2Device(common.DGTWINS_OPS_DELETE, devTwin)
 		dm.context.SendResponseMessage(msg, msgContent)
 	}
 
@@ -332,7 +344,7 @@ func (dm *TwinModule) deviceDeleteHandle(msg *model.Message) (interface{}, error
 // If request twin is not exit, this func will return empty list.
 func (dm *TwinModule) deviceGetHandle(msg *model.Message) (interface{}, error) {
 	var twinMsg	common.TwinMessage
-	twins := make([]common.DeviceTwin, 0)
+	twins := make([]common.DigitalTwin, 0)
 
 	content, ok := msg.Content.([]byte)
 	if !ok {
@@ -356,10 +368,7 @@ func (dm *TwinModule) deviceGetHandle(msg *model.Message) (interface{}, error) {
 				return nil,  errors.New("invalud digital twin type")
 			}
 
-			//convert digital twin to device twin. 
-			deviceTwin := dm.Digital2Device(savedTwin)
-
-			twins = append(twins, *deviceTwin)
+			twins = append(twins, *savedTwin)
 		}else {
 			// not exist, ignore.
 		}
@@ -404,6 +413,7 @@ func (dm *TwinModule) deviceResponseHandle(msg *model.Message) (interface{}, err
 
 			klog.Infof("Device is online, update device with (%v)", deviceMsg)
 			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
+			
 		case common.DeviceNotReady:
 		}
 
@@ -425,14 +435,12 @@ func (dm *TwinModule) deviceResponseHandle(msg *model.Message) (interface{}, err
 func (dm *TwinModule) PingDevice() {
 	dm.context.DGTwinList.Range(func(key, value interface{}) bool {
 		twinID := key.(string)
-		
-		msgContent, err := common.BuildDeviceMessage(&common.DeviceTwin{ID: twinID})
-		if err == nil {
-			modelMsg := dm.context.BuildModelMessage(types.MODULE_NAME, common.DeviceName, 
-								common.DGTWINS_OPS_SYNC, common.DGTWINS_RESOURCE_DEVICE, msgContent)
-			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
+		twin :=	&common.DeviceTwin{
+			ID: twinID,
+			State:	dm.context.GetTwinState(twinID),
 		}
 
+		dm.context.SendMessage2Device(common.DGTWINS_OPS_DETECT, twin)
 		return true	
 	})	
 }

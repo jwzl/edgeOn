@@ -151,17 +151,15 @@ func (dtc *DTContext) DGTwinIsExist (deviceID string) bool {
 	return true
 }
 
-func (dtc *DTContext) TwinIsOnline(deviceID string) bool {
-	v, _ := dtc.DGTwinList.Load(deviceID)
+func (dtc *DTContext) GetTwinState(twinID string) string {
+	v, _ := dtc.DGTwinList.Load(twinID)
 	dgTwin, _ := v.(*common.DigitalTwin)
 	
-	if dgTwin != nil {
-		if dgTwin.State == common.DGTWINS_STATE_ONLINE {
-			return true
-		}
+	if dgTwin == nil {
+		return ""
 	}
 
-	return false
+	return dgTwin.State
 }
 
 func (dtc *DTContext) BuildModelMessage(source string, target string, operation string, resource string, content interface{}) *model.Message {
@@ -199,13 +197,9 @@ func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []b
 }
 
 //SendSyncMessage Send sync conten.
-func (dtc *DTContext) SendSyncMessage(we *types.WatchEvent, content []byte){
-	target := we.Source
-	resource := we.Resource
-
+func (dtc *DTContext) SendSyncMessage(target, resource string, content []byte){
 	modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, target, 
-					common.DGTWINS_OPS_SYNC, resource, content)	
-	modelMsg.SetTag(we.MsgID)	
+					common.DGTWINS_OPS_SYNC, resource, content)		
 	klog.Infof("Send sync message (%v)", modelMsg)
 
 	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)

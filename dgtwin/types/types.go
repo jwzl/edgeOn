@@ -11,7 +11,7 @@ const (
 	DGTWINS_MODULE_PROPERTY	= "property"
 	DGTWINS_MODULE_COMM	= "comm"
 
-	DGTWINS_MSG_TIMEOUT = 5		//5s 
+	DGTWINS_MSG_TIMEOUT = 1*60		//5s 
 )
 
 type DTMessage struct {
