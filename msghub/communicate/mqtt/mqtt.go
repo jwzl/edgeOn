@@ -112,13 +112,13 @@ func (c *MqttClient) messageArrived(topic string, msg *model.Message){
 		c.messageFifo.Write(msg)
 	}else if strings.Contains(splitString[4], "bind") {
 		//report the edge information.
-		info := common.EdgeInfo{
+		info := &common.EdgeInfo{
 			EdgeID: c.conf.ClientID,
-			EdgeName: "",
-			Description: "",
+			EdgeName: "123",
+			Description: "123",
 		}
 		modelMsg := common.BuildModelMessage(common.HubModuleName, common.CloudName, 
-				common.DGTWINS_OPS_RESPONSE, common.DGTWINS_RESOURCE_EDGE, info) 	
+				common.DGTWINS_OPS_RESPONSE, common.DGTWINS_RESOURCE_EDGE, info) 		
 		c.WriteMessage("", modelMsg)
 		// start go rountine to send heartbeat.
 		if true != c.isBind {

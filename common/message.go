@@ -177,7 +177,15 @@ func BuildModelMessage(source string, target string, operation string, resource 
 	msg.BuildRouter(source, "", target, resource, operation)
 	
 	//content
-	msg.Content = content
+	switch content.(type){
+	case []byte:
+		msg.Content = content
+	default:
+		bytes, _ := json.Marshal(content)
+		//if err == nil {
+			msg.Content = bytes
+		//}
+	}	
 	
 	return msg
 }
@@ -278,6 +286,6 @@ func UnMarshalDeviceResponseMessage(msg *model.Message)(*DeviceResponse, error){
 
 type EdgeInfo struct{
 	EdgeID		string	`json:"edgeid"`
-	EdgeName	string	`json:"edgeid,omitempty"`
-	Description	string	`json:"edgeid,omitempty"`
+	EdgeName	string	`json:"edgename,omitempty"`
+	Description	string	`json:"description,omitempty"`
 }
