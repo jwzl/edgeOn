@@ -118,11 +118,12 @@ func (c *MqttClient) messageArrived(topic string, msg *model.Message){
 			Description: "123",
 		}
 		modelMsg := common.BuildModelMessage(common.HubModuleName, common.CloudName, 
-				common.DGTWINS_OPS_RESPONSE, common.DGTWINS_RESOURCE_EDGE, info) 		
+				common.DGTWINS_OPS_RESPONSE, common.DGTWINS_RESOURCE_EDGE, info)
+		modelMsg.SetTag(msg.GetID())	 		
 		c.WriteMessage("", modelMsg)
 		// start go rountine to send heartbeat.
 		if true != c.isBind {
-			go c.SendHeartBeat(modelMsg)
+			go c.SendHeartBeat(*modelMsg)
 			c.isBind =true 
 		}
 	}else{
@@ -147,15 +148,16 @@ func (c *MqttClient) WriteMessage(clientID string, msg *model.Message) error {
 	return c.client.Publish(pubTopic, msg)
 }
 
-func (c *MqttClient) SendHeartBeat(msg *model.Message){
+func (c *MqttClient) SendHeartBeat(msg model.Message){
 	KeepaliveCh := time.After(120 *time.Second)
 	msg.Router.Operation = common.DGTWINS_OPS_KEEPALIVE
+	msg.SetTag("")
 
 	for {
     	 <-KeepaliveCh
 	
 		pubTopic := fmt.Sprintf("%s/%s/hearbeat", MQTT_PUBTOPIC_PREFIX, c.conf.ClientID)
-		c.client.Publish(pubTopic, msg)
+		c.client.Publish(pubTopic, &msg)
 		klog.Infof("#######  Send heart beat to cloud.  #############")
 		KeepaliveCh = time.After(120 *time.Second)
 	}	
