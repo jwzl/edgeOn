@@ -34,6 +34,7 @@ const (
 	DGTWINS_OPS_UPDATE		= "Update"
 	DGTWINS_OPS_DELETE		= "Delete"
 	DGTWINS_OPS_GET			= "Get"
+	DGTWINS_OPS_List		= "List"
 	DGTWINS_OPS_RESPONSE	= "Response"
 	DGTWINS_OPS_WATCH		= "Watch"
 	DGTWINS_OPS_SYNC		= "Sync"
