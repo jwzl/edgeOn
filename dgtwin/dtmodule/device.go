@@ -58,7 +58,7 @@ func (dm *TwinModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, conf
 
 //Start Device module
 func (dm *TwinModule) Start(){
-	KeepaliveCh := time.After(120 *time.Second)
+	KeepaliveCh := time.After(5 *time.Second)
 	//Start loop.
 	for {
 		select {
@@ -96,7 +96,7 @@ func (dm *TwinModule) Start(){
 			//Check & sync device's state.
 			klog.Infof("#######  ping device  #############")
 			dm.PingDevice()	
-			KeepaliveCh = time.After(120 *time.Second)
+			KeepaliveCh = time.After(5 *time.Second)
 		}
 	}
 }
@@ -403,7 +403,7 @@ func (dm *TwinModule) deviceResponseHandle(msg *model.Message) (interface{}, err
     	}
 
 		switch code {
-		case common.DeviceFound:
+		case common.OnlineCode:
 			//Mark the state is online.
 			resp.Twin.State = common.DGTWINS_STATE_ONLINE
 
@@ -412,7 +412,7 @@ func (dm *TwinModule) deviceResponseHandle(msg *model.Message) (interface{}, err
 					common.DGTWINS_OPS_UPDATE, common.DGTWINS_RESOURCE_TWINS, content)
 
 			klog.Infof("Device is online, update device with (%v)", deviceMsg)
-			dm.context.SendToModule(types.DGTWINS_MODULE_COMM, deviceMsg)
+			dm.context.SendToModule(types.DGTWINS_MODULE_TWINS, deviceMsg)
 			
 		case common.DeviceNotReady:
 		}

@@ -200,7 +200,6 @@ func (dtc *DTContext) SendResponseMessage(requestMsg *model.Message, content []b
 func (dtc *DTContext) SendSyncMessage(target, resource string, content []byte){
 	modelMsg := dtc.BuildModelMessage(types.MODULE_NAME, target, 
 					common.DGTWINS_OPS_SYNC, resource, content)		
-	klog.Infof("Send sync message (%v)", modelMsg)
 
 	dtc.SendToModule(types.DGTWINS_MODULE_COMM, modelMsg)
 }

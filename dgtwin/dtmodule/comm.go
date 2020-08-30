@@ -44,7 +44,7 @@ func (cm *CommModule) InitModule(dtc *dtcontext.DTContext, comm, heartBeat, conf
 //TODO: Device should has a healthcheck.
 func (cm *CommModule) Start(){
 	//Start loop.
-	checkTimeoutCh := time.After(10*time.Second)
+	checkTimeoutCh := time.After(2*time.Second)
 	for {
 		select {
 		case msg, ok := <-cm.recieveChan:
@@ -91,7 +91,7 @@ func (cm *CommModule) Start(){
 		case <-checkTimeoutCh:
 			//check  the MessageCache for response.
 			cm.dealMessageTimeout()	
-			checkTimeoutCh = time.After(10*time.Second)
+			checkTimeoutCh = time.After(2*time.Second)
 		}
 	}
 }
@@ -194,13 +194,13 @@ func (cm *CommModule) dealMessageTimeout() {
 		
 						msgContent, err := common.BuildDeviceMessage(dgtwin)
 						if err == nil {
-							modelMsg := common.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, common.DGTWINS_OPS_UPDATE, 
-																	common.DGTWINS_RESOURCE_TWINS, msgContent)
+							modelMsg := common.BuildModelMessage(types.MODULE_NAME, types.MODULE_NAME, common.DGTWINS_OPS_UPDATE, common.DGTWINS_RESOURCE_TWINS, msgContent)
 							cm.context.SendToModule(types.DGTWINS_MODULE_TWINS, modelMsg)
 						}
+						
+						klog.Infof("### Detect Device(%s) is offline", twinID)
 					}
 					cm.context.MessageCache.Delete(key)
-					klog.Infof("### Detect Device(%s) is offline", twinID)
 				}else {
 					//resend this message.
 					klog.Infof("### Resend this message...")

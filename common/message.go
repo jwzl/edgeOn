@@ -196,31 +196,57 @@ func BuildModelMessage(source string, target string, operation string, resource 
 func GetTwinID(msg *model.Message) string {
 	var twins  []DigitalTwin
 	operation := msg.GetOperation()
+	target := msg.GetTarget()
 	
 	content, ok := msg.Content.([]byte)
 	if !ok {
 		return ""
 	}
-
-	if strings.Compare(DGTWINS_OPS_RESPONSE, operation) == 0 {
-		var resp TwinResponse
-
-		err := json.Unmarshal(content, &resp)
-		if err != nil {
-			return ""
-		}
-
-		twins = resp.Twins	
-	}else {
-		var dgTwinMsg TwinMessage
-
-		err := json.Unmarshal(content, &dgTwinMsg)
-		if err != nil {
-			return ""
-		}	
+	
+	if strings.Contains(target, DGTWINS_RESOURCE_DEVICE) {
+		if strings.Compare(DGTWINS_OPS_RESPONSE, operation) == 0 {
+			var resp DeviceResponse
+			
+			err := json.Unmarshal(content, &resp)
+			if err != nil {
+				return ""
+			}
+			
+			return resp.Twin.ID
+		}else {
+			var devMsg DeviceMessage
 		
-		twins = dgTwinMsg.Twins	
+			err := json.Unmarshal(content, &devMsg)
+			if err != nil {
+				return ""
+			}
+			
+			return devMsg.Twin.ID	
+		}
+	}else{
+		//twin message.
+		if strings.Compare(DGTWINS_OPS_RESPONSE, operation) == 0 {
+			var resp TwinResponse
+
+			err := json.Unmarshal(content, &resp)
+			if err != nil {
+				return ""
+			}
+
+			twins = resp.Twins	
+		}else {
+			var dgTwinMsg TwinMessage
+
+			err := json.Unmarshal(content, &dgTwinMsg)
+			if err != nil {
+				return ""
+			}	
+		
+			twins = dgTwinMsg.Twins	
+		}
 	}
+
+	
 
 	for _, dgTwin := range twins {
 		return dgTwin.ID
@@ -235,8 +261,7 @@ func BuildDeviceMessage(twin *DeviceTwin) ([]byte, error){
 		Twin:	*twin,		
 	}
 
-	resultJSON, err := json.Marshal(DeviceMsg)
-	return resultJSON, err
+	return json.Marshal(DeviceMsg)
 }
 
 // UnMarshal the device message.
