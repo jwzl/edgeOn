@@ -19,9 +19,6 @@ Client
 	> $ git clone  https://github.com/jwzl/edgeOn.git
 	> $ cd 	edgeOn
 	> $ make
-	> $ cd  tests  
-	> $ go build mqtt_demo.go
-	> $ mv mqtt_demo  cloud_dummy_app
 
 ### 2. build edgedev (device sides)
 	> $ git clone https://github.com/jwzl/edgedev.git
@@ -35,11 +32,19 @@ Client
     > # configure the edgeOn/conf/edge.yaml 
 	> ./edgeOn
 
-### 5. run the test app dummy cloud app	 (dummy cloud sides)
-	> $ cd 	edgeOn/tests
-	> $ ./cloud_dummy_app
+### 5. build & run edgecloud server
+	> $ git clone https://github.com/jwzl/edgecloud.git
+	> $ cd 	edgecloud/
+	> $ make
+	> ## modify the conf/cloud.yaml to match your case.
+	> $ ./edgecloud
+	
+### 6. build a web font
+	> $ git clone https://github.com/jwzl/edgeweb.git
+	> $ cd 	edgeweb/
+	> $ npm start
 
-	Then, you can see the device detailed information in cloud_dummy_app sides.
+	Then, you can see the device detailed information in your browser when enter the link  http://localhost:3000/ in browser, and do some test.
 
 ## Contributing
 
